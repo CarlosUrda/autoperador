@@ -34,15 +34,26 @@ yMenu := 60
 nombreArchivo := "pesos.txt"
 rutaExcel := "\\Salud.madrid.org\jcespeciales\Srv Administracion Sistemas\Explotacion\Actividades Operacion\Utilidades\TablasCopiasBackupCPDExt\Monitorización\DP_CPDExt_23122024_al_29122024.xlsx"
 
-WinActivate(ventana)  ; Asegura que la ventana esté activa
-Sleep(500)  ; Pausa para asegurarse de que la ventana esté lista
-
 nombreServ := StatusBarGetText(3, WinGetID("A"))
 nombreServ := ControlGetText("msctls_statusbar321", "A")
 ; Envía SB_GETTEXT para obtener el texto de una parte específica de la barra de estado (índice 0, 1, 2, etc.)
 nombreServ := SendMessage(0x0400 + 0x0020, 2, 0, "msctls_statusbar321", "A")
 MsgBox(nombreServ)
 excel := CrearExcel(rutaExcel, 1)
+
+/*
+    Gestionar las políticas de un solo servidor conectado en una ventana de DP.
+
+    ARGUMENTOS:
+    - idVentana: id de la ventana con la instancia del servidor DP.
+    - nombreServidor: nombre del servidor conectado.
+    - excel: objeto excel donde ir volcando los datos.
+    - nombreLog
+
+*/
+GestionarServidor(idVentana, nombreServidor, excel, archivoDatos)
+WinActivate(ventana)  ; Asegura que la ventana esté activa
+Sleep(500)  ; Pausa para asegurarse de que la ventana esté lista
 
 MouseClick("left", xMenu, yMenu)  
 Sleep(300)
