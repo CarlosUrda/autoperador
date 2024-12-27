@@ -4,7 +4,6 @@
 
 #Requires AutoHotkey v2.0
 
-NIVELES_DEBUG := Map("NINGUNO", 0, "BAJO", 1, "MEDIO", 2, "ALTO", 3)
 NIVEL_GENERAL_DEBUG := "" ; Nivel general de debug a ser usado por defecto (0, 1, 2 o 3)
 NOMBRE_LOG := ""          ; Nombre del archivo de log
 ARCHIVO_LOG := ""         ; Archivo de log abierto
@@ -13,14 +12,51 @@ MENSAJES_ERRORES := Map(CODIGOS_ERRORES["CORRECTO"], "Todo correcto sin errores"
                         CODIGOS_ERRORES["ERR_VALOR"], "Valor erróneo",
                         CODIGOS_ERRORES[""])
 
+
 /* Excepciones personalizadas */
 class ArgumentoError extends Error {
-    __New(mensaje, codigo) {
-        this.message := mensaje
-        this.what := codigo
+    __New(mensaje, funcion := "", codigo := "") {
+        this.Message := mensaje
+        if (funcion != "")
+            this.What := funcion
+        if (codigo != "")
+            this.Extra := codigo
     }
 }
 
+/*
+    Clase para encapsular un archivo de Log.
+
+    @property {number} _nivelMinimo - Nivel de importancia mínimo que deberán tener los mensajes para poder ser registrados en el log
+    @property {FileObj} _archivoLog - Archivo donde se volcarán los datos del log
+*/
+class Log {
+    ; Tipos de niveles de los mensajes a ser mostrados en el log:
+    ; - INFORMACION: Nivel de importancia muy bajo para mensajes informativos
+    ; - AVISO: Nivel de importancia bajo para avisos leves.
+    ; - MEDIO: Nivel para avisos de importancia media.
+    ; - CRITICO: Nivel para mensajes de importancia crítica.
+    ; - 
+    static NIVELES := Map("INFORMACION", 0, "AVISO", 1, "MEDIO", 2, "CRITICO", 3)
+
+    /*
+        Constructor de Log
+
+        @param {number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
+        @param {string} nombreArchivo - Nombre del archivo de log a abrir.
+        -
+    */
+    __New(nivelMinimo, nombreArchivo) {
+        if nivelMinimo not in this.NIVELES 
+        this._nivelMinimo := 
+        FileOpen
+    }
+
+    Nivel[] {
+        get => _nivel
+        set => _nivel := Value
+    }
+}
 
 /*
     Inicializar todo lo necesario para comenzar laa gestión de log.
