@@ -14,7 +14,7 @@ if (!IsSet(__UTIL_H__)) {
         @description Comprueba si un elemento está dentro de una estructura enumerable (tipo Enumerator u objeto que  contiene método __Enum). En caso de admitir dos argumentos, como Map o Array, comprueba los valores y no las claves o índices.
 
         @param {*} elem - valor a comprobar si está dentro de la lista.
-        @param {Object<__Enum>} enum - Estructura enumerable (__Enum) donde comprobar el valor
+        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
