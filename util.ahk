@@ -35,7 +35,7 @@ if (!IsSet(__UTIL_H__)) {
         }
         ; La excepción debería saltar solamente porque enum no admite dos argumentos.
         catch {
-            ; Aquí ya no debería lanzar más excepciones porque enum es Enumerator o __Enum y obligatoriamente tiene que tener al menos un argumento. Además en toería no hay excepciones en ahk por comparar tipos distintos.
+            ; Aquí ya no debería lanzar más excepciones porque enum es Enumerator o __Enum y obligatoriamente tiene que tener al menos un argumento. Además, en teoría, no hay excepciones en ahk por comparar tipos distintos.
             for valor in enum 
                 if (elem == valor)
                     return true
