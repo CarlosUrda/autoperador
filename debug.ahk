@@ -5,6 +5,7 @@
 #Requires AutoHotkey v2.0
 
 #Include "util.ahk"
+#Include "error.ahk"
 
 
 NOMBRE_LOG          := "" ; Nombre del archivo de log
@@ -12,7 +13,8 @@ ARCHIVO_LOG         := "" ; Archivo de log abierto
 
 
 /*
-    Clase para encapsular un archivo de Log.
+    @class Log
+    @description Clase para encapsular un archivo de Log.
 
     @property {Number} NivelMinimo - Obtener o cambiar el valor del nivel mínimo de los mensajes.
 
@@ -28,23 +30,20 @@ class Log {
         @method Constructor
 
         @param {String} nombreArchivo - Nombre del archivo de log a abrir o crear.
-        @param {String} modo - Modo de inicio del archivo ("w" para crear el archivo vacío; "a" para abrir desde el final del archivo)
+        @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
         @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
 
-        @throws {ValueError} - Si los argumentos nivelMinimo o modo no tienen valores correctos
+        @throws {ValueError} - Si el argumentos nivelMinimo no tiene valor correcto de Log.NIVELES
         @throws {OSError} - Si hay problemas al abrir el archivo o moverse dentro al inicializarlo.
     */
-    __New(nombreArchivo, modo := "w", nivelMinimo := this.NIVELES["INFORMACION"]) {
+    __New(nombreArchivo, vaciarLog := true, nivelMinimo := this.NIVELES["INFORMACION"]) {
         if not Util_enValores(nivelMinimo, this.NIVELES)
             ErrLanzar(ValueError, "Primer argumento debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
-
-        if (modo != "w" and modo != "a")
-            ErrLanzar(ValueError, "El tercer argumento debe ser un modo válido ('w' o 'a')", ERR_ERRORES["ERR_ARG"])
 
         this._nivelMinimo := nivelMinimo
 
         try 
-            this._archivo := FileOpen(nombreArchivo, modo)
+            this._archivo := FileOpen(nombreArchivo, vaciarLog ? "w" : "a")
         catch as e
             ErrLanzar(OSError, "El archivo " nombreArchivo " no puede abrirse: " e.message, ERR_ERRORES["ERR_ARCHIVO"])
         
@@ -92,7 +91,56 @@ class Log {
         this._archivo.Length := 0      
 
     }
+
+
+    /*
+        @method EscribirMensaje
+        @descripcion escribir un mensaje en el archivo de este objeto Log.      
+
+        @param mensaje {String} - Cadena de texto a escribir como mensaje
+        @param nivelMensaje {Number} - nivel de importancia del mensaje (valor posible de Log.NIVELES)
+
+        @return {Number} - Número de bytes (no caracteres) escritos. Si el nivel del mensaje no es mínimo el nivel del Log, el mensaje no es escrito y devuelve 0.
+    */
+    EscribirMensaje(mensaje, nivelMensaje) {
+        if not Util_enValores(nivelMensaje, this.NIVELES)
+            ErrLanzar(ValueError, "Segundo argumento debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
+
+        return (nivelMensaje < this._nivelMinimo) ? 0 : this._archivo.WriteLine(mensaje)
+   }
 }
+
+/*
+    @class GestionLogs
+    @description Clase para gestionar los logs que se van a usar en un programa.
+
+    @static
+        - {Map} logAsociados - Contiene el objeto Log asociado con cada elemento ("GLOBAL" todo el programa)
+*/
+class GestionLogs {
+    static logAsociados := Map("GLOBAL", "")
+
+    static AsociarLog() {
+
+    }
+
+    static ObtenerLog() {
+
+    }
+
+    /*
+    */
+    static EscribirMensaje(mensaje, nivelMensaje, ) {
+        log := this.ObtenerLog()
+        if log == NULL
+            return 0
+
+        return log.EscribirMensaje(mensaje, nivelMensaje)
+
+    }
+
+}
+
 
 /*
     Inicializar todo lo necesario para comenzar laa gestión de log.
@@ -125,9 +173,3 @@ InicializarDebug(nombreLog := "datos.log", debugGeneral := "ALTO", resetLog := f
     return TIPOS_ERRORES["CORRECTO"]
 }
 
-/*
-    Guarda un mensaje en un archivo Log
-*/
-GrabarMensajeLog(mensaje, debugMensaje, debugEntorno := "", archivoLog := "") {
-
-}

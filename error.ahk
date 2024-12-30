@@ -29,7 +29,7 @@ if (!IsSet(__ERR_H__)) {
     */
     _ErrLanzar(tipoExcepcion, mensaje, codigoError, fecha := A_Now, funcion := A_ThisFunc, linea := A_LineNumber, script := A_ScriptName) => throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError)
     
-    global ErrLanzar := _Lanzar
+    global ErrLanzar := _ErrLanzar
 
     
     /* Excepciones personalizadas */

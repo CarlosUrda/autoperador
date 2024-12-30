@@ -11,6 +11,11 @@ if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
 
     /*
+        @global NULL {String} - En ahk una cadena vacía se usa como null o valor indefinido.
+    */
+    global NULL := ""
+
+    /*
         @function Util_enValores
         @description Comprueba si un elemento está dentro de los valores de un objeto enumerable (Enumerator u objeto con método __Enum). En caso de admitir dos argumentos, como Map o Array, comprueba los valores y no las claves o índices.
 
