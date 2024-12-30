@@ -27,14 +27,14 @@ class Log {
     /*
         @method Constructor
 
-        @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
         @param {String} nombreArchivo - Nombre del archivo de log a abrir o crear.
         @param {String} modo - Modo de inicio del archivo ("w" para crear el archivo vacío; "a" para abrir desde el final del archivo)
+        @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
 
         @throws {ValueError} - Si los argumentos nivelMinimo o modo no tienen valores correctos
         @throws {OSError} - Si hay problemas al abrir el archivo o moverse dentro al inicializarlo.
     */
-    __New(nivelMinimo, nombreArchivo, modo := "w") {
+    __New(nombreArchivo, modo := "w", nivelMinimo := this.NIVELES["INFORMACION"]) {
         if not Util_enValores(nivelMinimo, this.NIVELES)
             ErrLanzar(ValueError, "Primer argumento debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
 
@@ -51,33 +51,6 @@ class Log {
         this._nombreArchivo = nombreArchivo
 
     }
-
-    /*
-
-        if Type(archivo) != "File" 
-            try {
-                this._archivo := FileOpen(archivo, modo)
-            }
-            catch {
-                throw OSError("El archivo " archivo " no puede abrirse en el modo '" modo "'", A_ThisFunc "(L" A_LineNumber ") " "[" A_ScriptName "]", ERR_ERRORES["ERR_ARCHIVO"]))
-            }
-        else {
-            resultado := ""
-            if modo == "w" {
-                archivo.Length := 0      
-                resultado := archivo.Seek(0) ; Existe la posibilidad de que se vacíe el archivo pero dé error al mover el puntero al inicio. Si ocurre esto, no hay problema por haber vacíado el archivo ya que nos lo habían pedido así, pero se notifica el error después indicando que no se ha iniciado correctamente el archivo al no poder situar el puntero al inicio también
-            }
-            else if modo == "a"
-                resultado := archivo.Seek(0, 2)
-            else
-                throw ValueError("El tercer argumento debe ser un modo válido ('w' o 'a')", A_ThisFunc "(L" A_LineNumber ") " "[" A_ScriptName "]", ERR_ERRORES["ERR_ARG"]))
-
-            if not resultado
-                throw OSError("El archivo no puede iniciar la posición correctamente en el modo '" modo "'", A_ThisFunc "(L" A_LineNumber ") " "[" A_ScriptName "]", ERR_ERRORES["ERR_ARCHIVO"]))
-
-            this._archivo := archivo
-        }
-    */
 
     
     /*
