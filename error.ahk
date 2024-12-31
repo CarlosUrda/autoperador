@@ -1,18 +1,22 @@
 #Requires AutoHotkey v2.0
 
+#Include "util.ahk"
+
 if (!IsSet(__ERR_H__)) {
     global __ERR_H__ := true
 
     /*
      Tipos de errores con su código correspondiente y acciones a realizar para cada uno de ellos.
     */
-    ERR_ERRORES := Map("CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3)
-    ERR_ACCIONES := Map("CONTINUAR", 0, "PARAR_FUNCION", 1, "PARAR_PROGRAMA", 2)
+    ERR_ERRORES := Map("NINGUNO", NULL, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
+    ERR_ACCIONES := Map("NINGUNO", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["CORRECTO"], Map("nombre", "CORRECTO", "accion", ERR_ACCIONES["CONTINUAR"], "mensaje", "Ejecución realizada correcta"),
         ERR_ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
         ERR_ERRORES["ERR_ARG"], Map("nombre", "ERR_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo")
         ERR_ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo")
+        ERR_ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto")
+        ERR_ERRORES["ERR_TIPO"], Map("nombre", "ERR_TIPO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo")
     )
 
     /*
@@ -27,9 +31,19 @@ if (!IsSet(__ERR_H__)) {
         @param linea {Number} - Número de línea donde ocurre el error 
         @param script {String} - Nombre del archivo del script
     */
-    _ErrLanzar(tipoExcepcion, mensaje, codigoError, fecha := A_Now, funcion := A_ThisFunc, linea := A_LineNumber, script := A_ScriptName) => throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError)
+    _ErrLanzar(tipoExcepcion, mensaje, codigoError := ERR_ERRORES["NINGUNO"], fecha := A_Now, funcion := A_ThisFunc, linea := A_LineNumber, script := A_ScriptName) {
+        throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError)
+    } 
     
     global ErrLanzar := _ErrLanzar
+
+    /*
+        @function ErrMsgBox
+        @description Mostar un mensaje MsgBox con la información de una excepcion
+
+        @param e {Error} - Objeto clase Error con la información de la excepción.
+    */
+    global ErrMsgBox := e => MsgBox(e.What " - " e.Message, "ERROR " e.Extra ": " ERR_INFO_CODIGOS[e.Extra]["nombre"] " - " ERR_INFO_CODIGOS[e.Extra]["mensaje"])
 
     
     /* Excepciones personalizadas */
@@ -44,7 +58,7 @@ if (!IsSet(__ERR_H__)) {
         }
     }
 
-    class ErrorArchivo extends Error {
-    }
 
+    class ObjetoError extends Error {
+    }
 }   

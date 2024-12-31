@@ -38,7 +38,7 @@ class Log {
     */
     __New(nombreArchivo, vaciarLog := true, nivelMinimo := this.NIVELES["INFORMACION"]) {
         if not Util_enValores(nivelMinimo, this.NIVELES)
-            ErrLanzar(ValueError, "Primer argumento debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
+            ErrLanzar(ValueError, "nivelMinimo " nivelMinimo " debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
 
         this._nivelMinimo := nivelMinimo
 
@@ -110,6 +110,32 @@ class Log {
    }
 }
 
+
+/*
+    @class GrupoLog
+    @description Clase para encapsular un log como un grupo de tipos de mensajes para ese log
+*/
+class GrupoLog {
+    __New(nombre, logPadre, nombreArchivo, vaciarLog := true, nivelMinimo := Log.NIVELES["INFORMACION"], activado := true) {
+        if Type(logPadre) != "Log"
+            ErrLanzar(TypeError, "El padre no es un objeto tipo Log", ERR_ERRORES["ERR_TIPO"])
+
+        try {
+            this._log := Log(nombreArchivo, vaciarLog, nivelMinimo)
+        }
+        catch as e {
+            ErrMsgBox(e)
+            ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
+        }
+
+        this._nombre := nombre
+        this._logPadre:= logPadre
+        this._activado := activado
+        
+    }
+}
+
+
 /*
     @class GestionLogs
     @description Clase para gestionar los logs que se van a usar en un programa.
@@ -118,19 +144,45 @@ class Log {
         - {Map} logAsociados - Contiene el objeto Log asociado con cada elemento ("GLOBAL" todo el programa)
 */
 class GestionLogs {
-    static logAsociados := Map("GLOBAL", "")
 
-    static AsociarLog() {
+    static _gruposLogs := Map("GLOBAL", Map("log", NULL, "padre", NULL))
+
+    static asignarLog(log) {
 
     }
 
-    static ObtenerLog() {
+    /*
+        @method crearGrupoLog
+        @description Crear un objeto Log asociado a un grupo de tipos de mensajes determinados.
+
+        @param {String} nombreGrupo - Nombre del grupo de tipos de mensajes que irán a este log.
+        @param {String} nombreArchivo - Nombre del archivo de log a abrir o crear.
+        @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
+        @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
+
+        @throws {ObjetoError} - Si existe algún error al crear el objeto Log
+        
+    */
+    static crearGrupoLog(nombreGrupo, nombreArchivo, vaciarLog, nivelMinimo) {
+        try {
+            log := Log(nombreArchivo, vaciarLog, nivelMinimo)
+        }
+        catch as e {
+            MsgBox(e.What " - " e.Message, "ERROR " e.Extra ": " ERR_INFO_CODIGOS[e.Extra]["nombre"] " - " ERR_INFO_CODIGOS[e.Extra]["mensaje"])
+            ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
+        }
+        try {
+            this._grupoLogs[nombreGrupo] := 
+        }
+    }
+
+    static ObtenerLog(grupoLog) {
 
     }
 
     /*
     */
-    static EscribirMensaje(mensaje, nivelMensaje, ) {
+    static EscribirMensaje(mensaje, nivelMensaje, grupoLog) {
         log := this.ObtenerLog()
         if log == NULL
             return 0
