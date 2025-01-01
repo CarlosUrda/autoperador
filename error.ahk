@@ -6,11 +6,14 @@ if (!IsSet(__ERR_H__)) {
     global __ERR_H__ := true
 
     /*
-     Tipos de errores con su código correspondiente y acciones a realizar para cada uno de ellos.
+        Tipos de errores con su código correspondiente y acciones a realizar para cada uno de ellos.
+
+        NULL: No existe el código de error o se deconoce.
     */
-    ERR_ERRORES := Map("NINGUNO", NULL, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
-    ERR_ACCIONES := Map("NINGUNO", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
+    ERR_ERRORES := Map("NULL", NULL, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
+    ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     ERR_INFO_CODIGOS := Map(
+        ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
         ERR_ERRORES["CORRECTO"], Map("nombre", "CORRECTO", "accion", ERR_ACCIONES["CONTINUAR"], "mensaje", "Ejecución realizada correcta"),
         ERR_ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
         ERR_ERRORES["ERR_ARG"], Map("nombre", "ERR_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo")

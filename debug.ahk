@@ -104,7 +104,7 @@ class Log {
     */
     EscribirMensaje(mensaje, nivelMensaje) {
         if not Util_enValores(nivelMensaje, this.NIVELES)
-            ErrLanzar(ValueError, "Segundo argumento debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
+            ErrLanzar(ValueError, "NivelMensaje debe ser valor válido de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
 
         return (nivelMensaje < this._nivelMinimo) ? 0 : this._archivo.WriteLine(mensaje)
    }

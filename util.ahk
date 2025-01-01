@@ -32,7 +32,7 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_enValores(elem, enum) {
         if (not enum.HasMethod("__Enum") and Type(enum) != "Enumerator")
-            throw TypeError("El segundo argumento debe ser enumerable (__Enum o Enumerator)", A_ThisFunc "L" A_LineNumber ") " "[" A_ScriptName "]", ERROR_CODIGOS["ERR_ARG"])
+            ErrLanzar(TypeError, "El argumento enum debe ser enumerable (__Enum o Enumerator)", ERR_ERRORES["ERR_ARG"])
 
         try {
             for , valor in enum 
@@ -51,6 +51,11 @@ if (!IsSet(__UTIL_H__)) {
     }
 
     global Util_enValores := _Util_enValores
+
+
+    _Util_ConvertirFecha() {
+
+    }
 
 }
 
