@@ -15,6 +15,7 @@
 #Requires AutoHotkey v2.0
 
 
+
 CrearExcel(ruta, hoja) {
     xlApp := ComObject("Excel.Application")
     xlApp.Visible := True  ; Opcional: Mostrar Excel para depuración
