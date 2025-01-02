@@ -24,7 +24,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
-        @throws {TypeError} - Si el segundo argumento no es un objeto Enumerable o __Enum
+        @throws {TypeError} - Si el argumento enum no es un objeto Enumerable o __Enum
 
         @todo Comprobar el tipo concreto de excepción que lanza el for en los siguientes casos:
         - El argumento enum no ser enumerable.

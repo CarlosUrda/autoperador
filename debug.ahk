@@ -21,7 +21,7 @@ ARCHIVO_LOG         := "" ; Archivo de log abierto
     @method Vaciar - Vaciar el contenido del archivo log.
 
     @static
-        - {Map} NIVELES - Tipos de niveles de los mensajes a ser mostrados en el log.
+        - {Map} NIVELES - Niveles de criticidad de los mensajes a ser mostrados en el log.
 */
 class Log {
     static NIVELES := Map("INFORMACION", 0, "AVISO", 1, "MEDIO", 2, "CRITICO", 3)
@@ -45,7 +45,7 @@ class Log {
         try 
             this._archivo := FileOpen(nombreArchivo, vaciarLog ? "w" : "a")
         catch as e
-            ErrLanzar(OSError, "El archivo " nombreArchivo " no puede abrirse: " e.message, ERR_ERRORES["ERR_ARCHIVO"])
+            ErrLanzar(OSError, "El archivo " nombreArchivo " no puede abrirse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
         
         this._nombreArchivo = nombreArchivo
 
@@ -56,7 +56,11 @@ class Log {
         @method Destructor de Log
     */
     __Delete() {
-        this._archivo.Close()
+        try {
+            this._archivo.Close()
+        }
+        catch as e
+            ErrLanzar(OSError, "El archivo " this._nombreArchivo " no puede cerrarse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
     }
 
 
@@ -72,7 +76,7 @@ class Log {
         get => this._nivelMinimo
         set {
             if not Util_enValores(value, this.NIVELES)
-                ErrLanzar(ValueError, "El valor debe ser un nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"]))
+                ErrLanzar(ValueError, "El valor debe ser un nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
     
             this._nivelMinimo := value
         }
@@ -113,23 +117,29 @@ class Log {
 
 /*
     @class GrupoLog
-    @description Clase para encapsular un log como un grupo de tipos de mensajes para ese log
+    @description Clase para asociar un log con un grupo de tipos de mensajes para ese log
+
+    @param nombre {String} - Nombre del grupo asociado a un log.
+    @param logPadre {GrupoLog} - GrupoLog de jerarquia superior a usar en caso de
 */
 class GrupoLog {
-    __New(nombre, logPadre, nombreArchivo, vaciarLog := true, nivelMinimo := Log.NIVELES["INFORMACION"], activado := true) {
-        if Type(logPadre) != "Log"
+    __New(nombre, grupoLogPadre, nombreArchivo, vaciarLog := true, nivelMinimo := Log.NIVELES["INFORMACION"], activado := true) {
+        if Type(grupoLogPadre) != "GrupoLog"
             ErrLanzar(TypeError, "El padre no es un objeto tipo Log", ERR_ERRORES["ERR_TIPO"])
 
-        try {
-            this._log := Log(nombreArchivo, vaciarLog, nivelMinimo)
-        }
-        catch as e {
-            ErrMsgBox(e)
-            ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
-        }
+        if nombreArchivo == NULL
+            this._log := NULL
+        else
+            try {
+                this._log := Log(nombreArchivo, vaciarLog, nivelMinimo)
+            }
+            catch as e {
+                ErrMsgBox(e)
+                ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
+            }
 
         this._nombre := nombre
-        this._logPadre:= logPadre
+        this._grupoLogPadre:= grupoLogPadre
         this._activado := activado
         
     }
