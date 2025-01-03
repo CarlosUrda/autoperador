@@ -93,7 +93,7 @@ class RegLog {
     */
     Activo {
         get => this._activo
-        set => this._activo := not (value == false)
+        set => this._activo := value != false
     }
 
 
