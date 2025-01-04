@@ -52,7 +52,7 @@ if (!IsSet(__REGLOG_H__)) {
                 switch arg {
                     case "nivel":
                         if not Util_enValores(valor, this.NIVELES)
-                            ErrLanzar(ValueError, "El nivel " valor " debe ser un valor contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
+                            ErrLanzar(ValueError, "El nivel " valor " debe ser un valor contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"], linea, funcion)
                 }
             }
         }
