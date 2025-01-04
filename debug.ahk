@@ -31,14 +31,14 @@ class RegLog {
         @method Constructor
 
         @param {String} nombreArchivo - Nombre del archivo de log a abrir o crear.
-        @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
-        @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
+        @param {Number} nivelMinimo - Nivel mínimo de criticidad que deberán tener los mensajes para poder ser registrados en el log
+        @param {Boolean} vaciarLog - true se crea el archivo de log vacío (modo "w" al abrirlo); false lo abre manteniendo su contenido posicionándose al final (modo "a").
         @param {Boolean} activo - Si false impide que se escriban mensajes en el log.
 
         @throws {ValueError} - Si el argumentos nivelMinimo no tiene valor correcto de Log.NIVELES
         @throws {OSError} - Si hay problemas al asignar el archivo al log.
     */
-    __New(nombreArchivo, vaciarLog := true, nivelMinimo := this.NIVELES["INFORMACION"], activo := true) {
+    __New(nombreArchivo, nivelMinimo := this.NIVELES["INFORMACION"], vaciarLog := true, activo := true) {
         if not Util_enValores(nivelMinimo, this.NIVELES)
             ErrLanzar(ValueError, "nivelMinimo " nivelMinimo " debe ser valor de nivel contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"])
 
@@ -68,7 +68,7 @@ class RegLog {
     /*
         @method AsignarArchivo
 
-        @description Abrir un archivo para dejarlo asignarlo a este log.
+        @description Abrir un archivo dejándolo asignarlo a este log.
 
         @param {String} nombreArchivo - Nombre del archivo de log a abrir o crear.
         @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
@@ -93,7 +93,7 @@ class RegLog {
     */
     Activo {
         get => this._activo
-        set => this._activo := value != false
+        set => this._activo := !!value
     }
 
 
@@ -148,88 +148,147 @@ class RegLog {
 }
 
 
-/*
-    @class GrupoLog
-    @description Clase para asociar un log con un grupo de tipos de mensajes para ese log. Sirve para poder etiquetar un Log mediante un nombre guardando toda la información relacionada con el Log.
-
-    @param nombreGrupo {String} - Nombre del grupo asociado a un log.
-    @param grupoLogPadre {GrupoLog} - GrupoLog de jerarquia superior a usar en caso de
-    @param nombreArchivo {String} - Nombre del archivo de Log
-
-*/
-/*
-class GrupoLog {
-    __New(nombreGrupo, grupoLogPadre, nombreArchivo, vaciarLog := true, nivelMinimo := Log.NIVELES["INFORMACION"], activado := true) {
-        if grupoLogPadre != NULL and Type(grupoLogPadre) != "GrupoLog"
-            ErrLanzar(TypeError, "El padre no es un objeto tipo Log", ERR_ERRORES["ERR_TIPO"])
-
-        if nombreArchivo == NULL
-            this._log := NULL
-        else
-            try {
-                this._log := Log(nombreArchivo, vaciarLog, nivelMinimo)
-            }
-            catch as e {
-                ErrMsgBox(e)
-                ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
-            }
-
-        this._nombre := nombreGrupo
-        this._grupoLogPadre:= grupoLogPadre
-        this._activado := activado
-        
-    }
-}
-*/
-
 
 /*
-    @class GestionLogs
-    @description Clase para gestionar los logs que se van a usar en un programa.
-
-    @method crearLog - 
+    @class ContenedorLogs
+    @description Clase contenedor para guardar logs asociados a un nombre.
 
     @static
-        - _logs {Map} - Diccionario donde se guardan los logs, etiquetando cada uno con un nombre que lo identifica de manera única. La clave es el nombre usado para etiquetar al log y el valor es otro Map que contiene los valores: 
-            "log" {Log} - Objeto log.
+        - _infoLogs {Map} - Diccionario donde se guardan los logs, etiquetando cada uno con un nombre que lo identifica de manera única. La clave es el nombre usado para etiquetar al log y el valor es otro Map que contiene los valores: 
+            "log" {RegLog} - Objeto Reglog.
             "padre" {String} - Nombre de la etiqueta del log padre.
-            "activado" {Boolean} - Si false el log no se usará y no se volcarán mensajes.
+            "delegar" {Boolean} - Si false el log no se usará y no se volcarán mensajes.
 */
-class GestionLogs {
+class ContenedorLogs {
 
-    static _logs := Map("GLOBAL", Map("log", NULL, "padre", NULL, "activado", true))
+    static _infoLogs := Map("GLOBAL", Map("log", NULL, "padre", NULL, "delegar", false))
 
-    static asignarLog(log) {
+
+    /*
+        @method _ComprobarArgs
+
+        @description Comprobar los argumentos que se pasan a los distintos métodos de ContenedorLogs
+
+        @param {Map} args - Diccionario con el par (nombre de argumento, valor)
+        @param {Number} linea - Número de línea donde ocurre el error en la función llamante
+        @param {String} funcion - Nombre de la función llamante.
+
+        @throws {ValueError} - Si el nombreLog no es válido.
+        @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
+        @throws {TypeError} - Si el objeto Log no es de tipo RegLog
+
+    */
+    static _ComprobarArgs(args, linea := A_LineNumber, funcion := A_ThisFunc) {
+        for arg, valor in args {
+            switch arg {
+                case "nombreLog":
+                    if not this.ExisteLog(valor)
+                        ErrLanzar(IndexError, "El log " valor " no existe en el contenedor", ERR_ERRORES["ERR_ARG"], linea, funcion)
+
+                case "nombreLog_repe":
+                    if valor == NULL or this.ExisteLog(valor)
+                        ErrLanzar(ValueError, "Nombre de log " valor " a agregar no válido: Ya existe o es vacío)", ERR_ERRORES["ERR_ARG"], linea, funcion)
+            
+                case "nombreLogPadre":
+                    if valor != NULL and not this.ExisteLog(valor)
+                        ErrLanzar(IndexError, "El nombre " valor " del log padre no existe en el contenedor", ERR_ERRORES["ERR_ARG"], linea, funcion)
+
+                case "regLog":
+                    if valor != NULL and Type(valor) != "RegLog"
+                        ErrLanzar(TypeError, "El argumento regLog no es de tipo correcto", ERR_ERRORES["ERR_ARG"], linea, funcion)
+            
+            }
+        }
 
     }
 
     /*
-        @method crearGrupoLog
-        @description Crea un log asociándolo con un nombre que lo identifica. Sirve para poder etiquetar un Log mediante un nombre guardando información adicional relacionada con el Log.
+        @property __Item
+
+        @description Acceder al objeto RegLog asociado con un nombre de log. 
+
+        @param {String} nombreLog - Nombre del log a obtener o modificar.
+
+        @method get - Obtiene el objeto RegLog asociado con el nombreLog. Si el nombre de log tiene activado la delegación al padre, se obtiene el RegLog del primer padre que no delega.
+        @method set - Cambia el objeto RegLog asociado con el nombreLog.
+    */
+    static __Item[nombreLog] {
+        get {
+            this._ComprobarArgs(Map("nombreLog", nombreLog))
+
+            infoLog := this._infoLogs[nombreLog]
+
+            if infoLog["delegar"] {
+                return infoLog["padre"] == NULL ? NULL : this[infoLog["padre"]]
+            }
+
+            return infoLog["log"]
+        }
+
+        set {
+            this._ComprobarArgs(Map("nombreLog", nombreLog), A_LineNumber, A_ThisFunc)
+
+            if value != NULL and Type(value) != "RegLog"
+                ErrLanzar(TypeError, "El valor no es de tipo correcto RegLog", ERR_ERRORES["ERR_TIPO"])
+    
+            this._infoLogs[nombreLog]["log"] := value
+        }
+    }
+
+    /*
+        @method CambiarPadre
+
+        @description Cambiar el nombre del log del padre.
+
+        @param {String} nombreLog - Nombre del log a cambiar su padre.
+        @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL sin padre
+
+        @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
+    */
+    static CambiarPadre(nombreLog, nombreLogPadre, delegar) {
+        this._ComprobarArgs(Map("nombreLog", nombreLog, "nombreLogPadre", nombreLogPadre))
+
+        this._infoLogs[nombreLog]["padre"] := nombreLogPadre
+        this._infoLogs[nombreLog]["delegar"] := !!delegar
+    }
+
+
+    /*
+        @method Delegar
+
+        @description Cambiar la delegación al padre.
+
+        @param {String} nombreLog - Nombre del log a cambiar su delegación.
+        @param {Boolean} delegar - true ignora el log de nombreLog y usa el del padre.
+
+        @trhows {IndexError} - Si el nombre del log no existe en el contenedor.
+    */
+    static Delegar(nombreLog, delegar) {
+        this._ComprobarArgs(Map("nombreLog", nombreLog))
+
+        this._infoLogs[nombreLog]["delegar"] := !!delegar
+
+    }
+
+
+    /*
+        @method AgregarLog
+        @description Agrega un log al contenedor de logs asociándolo con un nombre que lo identifica.
 
         @param {String} nombreLog - Etiqueta para identificar al log.
-        @param {String} nombreArchivo - Nombre del archivo que se asignará al log.
-        @param {String} nombreLogPadre - Etiqueta para identificar al log padre.
-        @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
-        @param {Number} nivelMinimo - Umbral mínimo que deberán tener los mensajes para poder ser registrados en el log
-
-        @throws {ValueError} - Si existe algún error al crear el objeto Log
-        @throws {ObjetoError} - Si existe algún error al crear el objeto Log
+        @param {String|NULL} regLog - Objeto RegLog asociado al nombreLog. Puede ser NULL.
+        @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL si no tiene log padre.
+        @param {Boolean} delegar - true ignora ese log y usa el del padre.
+        
+        @throws {ValueError} - Si existe algún error con los valores de los argumentos.
+        @throws {TypeError} - Si el objeto Log no es de tipo RegLog
+        @trhows {IndexError} - Si el nombre del padre no existe en el contenedor.
         
     */
-    static CrearLog(nombreLog, nombreArchivo, nombreLogPadre, vaciarLog := true, nivelMinimo := Log.NIVELES["INFORMACION"], activado := true) {
-        if nombreLogPadre != NULL and not this.existeLog(nombreLogPadre)
-            ErrLanzar(ValueError, "El nombre del log padre no existe", ERR_ERRORES["ERR_ARG"])
-        if nombreLog == NULL
-            ErrLanzar(ValueError, "El nombre que identifica al log no puede estar vacío", ERR_ERRORES["ERR_ARG"])
+    static AgregarLog(nombreLog, regLog := NULL, nombreLogPadre := NULL, delegar := false) {
+        this._ComprobarArgs(Map("nombreLog_repe", nombreLog, "regLog", regLog, "nombreLogPadre", nombreLogPadre))
 
-        try {
-            this._logs[nombreLog] := Map("log", Log(nombreArchivo, vaciarLog, nivelMinimo), "padre", nombreLogPadre, "activado", activado)
-        }
-        catch as e {
-            ErrMsgBox(e)
-            ErrLanzar(ObjetoError, "No se ha podido crear el objeto Log para " nombreArchivo, ERR_ERRORES["ERR_OBJETO"])
-        }
+        this._infoLogs[nombreLog] := Map("log", regLog, "padre", nombreLogPadre, "delegar", delegar)
     }
 
 
@@ -242,65 +301,32 @@ class GestionLogs {
         @return true si el log existe, o false si no.
     */
     static ExisteLog(nombreLog) {
-        return this._logs.Has(nombreLog)
+        return this._infoLogs.Has(nombreLog)
     }
 
 
     /*
         @method EscribirLog
-        @description Escribir un mensaje en un log
+        @description Escribir un mensaje en el log asociado a nombreLog. Esta función envuelve a EscribirMensaje de un objeto RegLog y existe para no tener que comprobar si nombreLog no tiene ningún log asociado.
 
         @param nombreLog {String} - Nombre que idenrtifica al log.
         @param mensaje {String} - Mensaje a ser escrito en el log.
         @param nivelMensaje {Number} - Criticidad del mensaje cuyo valor debe estar en Log.NIVELES.
 
+        @trhows {IndexError} - Si el nombreLog no existe en el contenedor.
+
         @returns {Number} - Número de bytes escritos en el log
     */
     static EscribirLog(nombreLog, mensaje, nivelMensaje) {
         if not this.ExisteLog(nombreLog) {
-            ErrLanzar(ValueError, "No existe ningún log con el nombre " nombreLog, ERR_ERRORES["ERR_ARG"])
+            ErrLanzar(IndexError, "No existe ningún log con el nombre " nombreLog, ERR_ERRORES["ERR_ARG"])
         }
 
-        infoLog := this._logs[nombreLog]
-        if not infoLog["activado"]
+        regLog := this[nombreLog]
+        if regLog == NULL
             return 0
 
-        log := infoLog["delegar"] ? this._logs[infoLog["padre"]]["log"] : infoLog[nombreLog]["log"]
-
-        return log.EscribirMensaje(mensaje, nivelMensaje)
+        return regLog.EscribirMensaje(mensaje, nivelMensaje)
     }
 
 }
-
-
-/*
-    Inicializar todo lo necesario para comenzar laa gestión de log.
-
-    ARGUMENTOS:
-    - nombreLog: nombre del archivo de log a ser usado.
-    - debug: Nivel de debug a ser usado por defecto: "ALTO", "MEDIO", "BAJO", "NINGUNO"
-    - resetLog: Flag para saber si vacíar el archivo de log.
-*/
-InicializarDebug(nombreLog := "datos.log", debugGeneral := "ALTO", resetLog := false) {
-    global ARCHIVO_LOG
-    global NOMBRE_LOG
-    global NIVEL_GENERAL_DEBUG
-
-    try {
-        NIVEL_GENERAL_DEBUG := NIVELES_DEBUG[debugGeneral]
-    } catch UnsetItemError {
-        throw ArgumentoError("Nivel debug de tipo " debugGeneral " no existente", TIPOS_ERRORES["ARGUMENTO"])
-    }
-    NOMBRE_LOG := nombreLog
-    try {
-        ARCHIVO_LOG := FileOpen(NOMBRE_LOG, resetLog ? "w" : "a")
-    }
-    catch OSError as e {
-        throw ArgumentoError("Error al intentar abrir el archivo" NOMBRE_LOG ": " e.message, e.what, TIPOS_ERRORES["ERR_ARG"])
-    }
-    if (ARCHIVO_LOG == "")
-        throw ArgumentoError("Error al intentar abrir el archivo" NOMBRE_LOG, "FileOpen", TIPOS_ERRORES["ERR_ARG"])
-
-    return TIPOS_ERRORES["CORRECTO"]
-}
-
