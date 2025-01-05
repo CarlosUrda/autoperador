@@ -178,17 +178,17 @@ if (!IsSet(__REGLOG_H__)) {
 
     /*
         @class ContenedorLogs
-        @description Clase contenedor para guardar logs asociados a un nombre.
+        @description Clase contenedor para guardar por cada entrada toda la información asociada a un log.
 
         @static
-            - _infoLogs {Map} - Diccionario donde se guardan los logs, etiquetando cada uno con un nombre que lo identifica de manera única. La clave es el nombre usado para etiquetar al log y el valor es otro Map que contiene los valores: 
+            - _infoLogs {Map} - Diccionario donde se guarda por cada entrada toda la información de cada log. La clave es el nombre para identificar al log y el valor es un Map que contiene los valores: 
                 "log" {RegLog} - Objeto Reglog.
                 "padre" {String} - Nombre de la etiqueta del log padre.
                 "delegar" {Boolean} - Si false el log no se usará y no se volcarán mensajes.
     */
     class ContenedorLogs {
 
-        static _infoLogs := Map("GLOBAL", Map("log", NULL, "padre", NULL, "delegar", false))
+        static _infoLogs := Map()
 
 
         /*
@@ -226,8 +226,8 @@ if (!IsSet(__REGLOG_H__)) {
                 
                 }
             }
-
         }
+
 
         /*
             @property __Item
@@ -262,45 +262,31 @@ if (!IsSet(__REGLOG_H__)) {
             }
         }
 
+
         /*
             @method CambiarPadre
 
             @description Cambiar el nombre del log del padre.
 
             @param {String} nombreLog - Nombre del log a cambiar su padre.
-            @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL sin padre
+            @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL sin padre. Sin valor no se cambia el padre.
+            @param {Boolean} delegar - true ignora el log asociado a nombreLog y usa el del padre. Sin valor no se cambia.
 
             @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
         */
-        static CambiarPadre(nombreLog, nombreLogPadre, delegar) {
+        static CambiarPadre(nombreLog, nombreLogPadre?, delegar?) {
             this._ComprobarArgs(Map("nombreLog", nombreLog, "nombreLogPadre", nombreLogPadre))
 
-            this._infoLogs[nombreLog]["padre"] := nombreLogPadre
-            this._infoLogs[nombreLog]["delegar"] := !!delegar
-        }
-
-
-        /*
-            @method Delegar
-
-            @description Cambiar la delegación al padre.
-
-            @param {String} nombreLog - Nombre del log a cambiar su delegación.
-            @param {Boolean} delegar - true ignora el log de nombreLog y usa el del padre.
-
-            @trhows {IndexError} - Si el nombre del log no existe en el contenedor.
-        */
-        static Delegar(nombreLog, delegar) {
-            this._ComprobarArgs(Map("nombreLog", nombreLog))
-
-            this._infoLogs[nombreLog]["delegar"] := !!delegar
-
+            if IsSet(nombreLogPadre)
+                this._infoLogs[nombreLog]["padre"] := nombreLogPadre
+            if IsSet(delegar)
+                this._infoLogs[nombreLog]["delegar"] := !!delegar
         }
 
 
         /*
             @method AgregarLog
-            @description Agrega un log al contenedor de logs asociándolo con un nombre que lo identifica.
+            @description Agrega una entrada con toda la información de un log al contenedor de logs.
 
             @param {String} nombreLog - Etiqueta para identificar al log.
             @param {String|NULL} regLog - Objeto RegLog asociado al nombreLog. Puede ser NULL.
@@ -334,7 +320,7 @@ if (!IsSet(__REGLOG_H__)) {
 
         /*
             @method EscribirLog
-            @description Escribir un mensaje en el log asociado a nombreLog. Esta función envuelve a EscribirMensaje de un objeto RegLog y existe para no tener que comprobar si nombreLog no tiene ningún log asociado.
+            @description Escribir un mensaje en el RegLog asociado a nombreLog. Esta función envuelve a EscribirMensaje de un objeto RegLog y existe para no tener que comprobar si nombreLog no tiene ningún log asociado.
 
             @param nombreLog {String} - Nombre que idenrtifica al log.
             @param mensaje {String} - Mensaje a ser escrito en el log.
@@ -355,6 +341,7 @@ if (!IsSet(__REGLOG_H__)) {
 
             return regLog.EscribirMensaje(mensaje, nivelMensaje)
         }
+
 
     }
 }
