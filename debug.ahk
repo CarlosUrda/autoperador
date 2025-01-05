@@ -43,16 +43,22 @@ if (!IsSet(__REGLOG_H__)) {
             @param {Map} args - Diccionario con el par (nombre de argumento, valor)
             @param {Number} linea - Número de línea donde ocurre el error en la función llamante
             @param {String} funcion - Nombre de la función llamante.
+            @param {Number} codigoError - Número de código del error. Si el código no está entre los valores de ERR_ERRORES se ignora al lanzar la excepción.
 
             @throws {ValueError} - Si el argumentos nivelMinimo no tiene valor correcto de Log.NIVELES
 
+            @todo Enviar un codigoError por cada argumento a comprobar, aunque puede que sea innecesario porque al llamar a esta función se hace para comprobar varios valores a la vez, y el código de error suele ser el mismo para todos (por ejemplo, ERR_ARG).
         */
-        static _ComprobarArgs(args, linea := A_LineNumber, funcion := A_ThisFunc) {
+        static _ComprobarArgs(args, linea := A_LineNumber, funcion := A_ThisFunc, codigoError?) {
+            ; Esta comprobación podría sobrar ya que es un método privado solo llamado internamente, y en teoría voy a pasar siempre un código correcto.
+            if IsSet(codigoError) and not Util_enValores(codigoError, ERR_ERRORES)
+                codigoError := unset
+
             for arg, valor in args {
                 switch arg {
                     case "nivel":
                         if not Util_enValores(valor, this.NIVELES)
-                            ErrLanzar(ValueError, "El nivel " valor " debe ser un valor contenido en Log.NIVELES", ERR_ERRORES["ERR_ARG"], linea, funcion)
+                            Err_Lanzar(ValueError, "El nivel " valor " debe ser un valor contenido en Log.NIVELES", codigoError?, linea, funcion)
                 }
             }
         }
@@ -70,7 +76,7 @@ if (!IsSet(__REGLOG_H__)) {
             @throws {OSError} - Si hay problemas al asignar el archivo al log.
         */
         __New(nombreArchivo, nivelMinimo := this.NIVELES["INFORMACION"], vaciarLog := true, activo := true) {
-            this._ComprobarArgs(Map("nivel", nivelMinimo))
+            this._ComprobarArgs(Map("nivel", nivelMinimo), , , ERR_ERRORES["ERR_ARG"])
             this._nivelMinimo := nivelMinimo
             this.Activo := activo
 
@@ -168,7 +174,7 @@ if (!IsSet(__REGLOG_H__)) {
             @return {Number} - Número de bytes (no caracteres) escritos. Si el nivel de criticidad del mensaje no es mínimo el nivel del Log o el log no está activo, el mensaje no es escrito y devuelve 0.
         */
         EscribirMensaje(mensaje, nivelMensaje) {
-            this._ComprobarArgs(Map("nivel", nivelMensaje))
+            this._ComprobarArgs(Map("nivel", nivelMensaje), , , ERR_ERRORES["ERR_ARG"])
 
             return (!this.activo or nivelMensaje < this._nivelMinimo) ? 0 : this._archivo.WriteLine(mensaje)
         }
@@ -194,35 +200,45 @@ if (!IsSet(__REGLOG_H__)) {
         /*
             @method _ComprobarArgs
 
-            @description Comprobar los argumentos que se pasan a los distintos métodos de ContenedorLogs
+            @description Comprobar los argumentos que se pasan a los distintos métodos de ContenedorLogs. Nombre de argumentos a comprobar y saltan error:
+                - nombreLog: si el valor no existe como nombreLog en el contenedor.
+                - nombreLogRepe: si el valor ya existe como nombreLog en el contenedor o es NULL
+                - nombreLogPadre: si el valor no es NULL y no existe como nombreLog en el contenedor.
+                - regLog: si el valor no es NULL y no es de tipo RegLog.
 
             @param {Map} args - Diccionario con el par (nombre de argumento, valor)
             @param {Number} linea - Número de línea donde ocurre el error en la función llamante
             @param {String} funcion - Nombre de la función llamante.
+            @param {Number} codigoError - Número de código del error. Si el código no está entre los valores de ERR_ERRORES se ignora al lanzar la excepción.
 
             @throws {ValueError} - Si el nombreLog no es válido.
             @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
             @throws {TypeError} - Si el objeto Log no es de tipo RegLog
 
+            @todo Enviar un codigoError por cada argumento a comprobar, aunque puede que sea innecesario porque al llamar a esta función se hace para comprobar varios valores a la vez, y el código de error suele ser el mismo para todos (por ejemplo, ERR_ARG).
         */
-        static _ComprobarArgs(args, linea := A_LineNumber, funcion := A_ThisFunc) {
+        static _ComprobarArgs(args, linea := A_LineNumber, funcion := A_ThisFunc, codigoError?) {
+            ; Esta comprobación podría sobrar ya que es un método privado solo llamado internamente, y en teoría voy a pasar siempre un código correcto.
+            if IsSet(codigoError) and not Util_enValores(codigoError, ERR_ERRORES)
+                codigoError := unset
+
             for arg, valor in args {
                 switch arg {
                     case "nombreLog":
                         if not this.ExisteLog(valor)
-                            ErrLanzar(IndexError, "El log " valor " no existe en el contenedor", ERR_ERRORES["ERR_ARG"], linea, funcion)
+                            Err_Lanzar(IndexError, "El nombre de log " valor " no existe en el contenedor", codigoError?, linea, funcion)
 
                     case "nombreLog_repe":
                         if valor == NULL or this.ExisteLog(valor)
-                            ErrLanzar(ValueError, "Nombre de log " valor " a agregar no válido: Ya existe o es vacío)", ERR_ERRORES["ERR_ARG"], linea, funcion)
+                            Err_Lanzar(ValueError, "Nombre de log " valor " a agregar no válido: Ya existe o es vacío)", codigoError?, linea, funcion)
                 
                     case "nombreLogPadre":
                         if valor != NULL and not this.ExisteLog(valor)
-                            ErrLanzar(IndexError, "El nombre " valor " del log padre no existe en el contenedor", ERR_ERRORES["ERR_ARG"], linea, funcion)
+                            Err_Lanzar(IndexError, "El nombre " valor " del log padre no existe en el contenedor", codigoError?, linea, funcion)
 
                     case "regLog":
                         if valor != NULL and Type(valor) != "RegLog"
-                            ErrLanzar(TypeError, "El argumento regLog no es de tipo correcto", ERR_ERRORES["ERR_ARG"], linea, funcion)
+                            Err_Lanzar(TypeError, "El valor no es de tipo correcto RegLog", codigoError?, linea, funcion)
                 
                 }
             }
@@ -241,7 +257,7 @@ if (!IsSet(__REGLOG_H__)) {
         */
         static __Item[nombreLog] {
             get {
-                this._ComprobarArgs(Map("nombreLog", nombreLog))
+                this._ComprobarArgs(Map("nombreLog", nombreLog), , , ERR_ERRORES["ERR_INDICE"])
 
                 infoLog := this._infoLogs[nombreLog]
 
@@ -253,11 +269,8 @@ if (!IsSet(__REGLOG_H__)) {
             }
 
             set {
-                this._ComprobarArgs(Map("nombreLog", nombreLog), A_LineNumber, A_ThisFunc)
+                this._ComprobarArgs(Map("nombreLog", nombreLog, "regLog", value), , , ERR_ERRORES["ERR_INDICE"])
 
-                if value != NULL and Type(value) != "RegLog"
-                    ErrLanzar(TypeError, "El valor no es de tipo correcto RegLog", ERR_ERRORES["ERR_TIPO"])
-        
                 this._infoLogs[nombreLog]["log"] := value
             }
         }
@@ -275,7 +288,7 @@ if (!IsSet(__REGLOG_H__)) {
             @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
         */
         static CambiarPadre(nombreLog, nombreLogPadre?, delegar?) {
-            this._ComprobarArgs(Map("nombreLog", nombreLog, "nombreLogPadre", nombreLogPadre))
+            this._ComprobarArgs(Map("nombreLog", nombreLog, "nombreLogPadre", nombreLogPadre), , , ERR_ERRORES["ERR_ARG"])
 
             if IsSet(nombreLogPadre)
                 this._infoLogs[nombreLog]["padre"] := nombreLogPadre
@@ -299,7 +312,7 @@ if (!IsSet(__REGLOG_H__)) {
             
         */
         static AgregarLog(nombreLog, regLog := NULL, nombreLogPadre := NULL, delegar := false) {
-            this._ComprobarArgs(Map("nombreLog_repe", nombreLog, "regLog", regLog, "nombreLogPadre", nombreLogPadre))
+            this._ComprobarArgs(Map("nombreLog_repe", nombreLog, "regLog", regLog, "nombreLogPadre", nombreLogPadre), , , ERR_ERRORES["ERR_ARG"])
 
             this._infoLogs[nombreLog] := Map("log", regLog, "padre", nombreLogPadre, "delegar", delegar)
         }
