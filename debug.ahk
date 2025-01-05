@@ -319,29 +319,27 @@ if (!IsSet(__REGLOG_H__)) {
 
 
         /*
-            @method EscribirLog
-            @description Escribir un mensaje en el RegLog asociado a nombreLog. Esta función envuelve a EscribirMensaje de un objeto RegLog y existe para no tener que comprobar si nombreLog no tiene ningún log asociado.
+            @method MetodoRegLog
 
-            @param nombreLog {String} - Nombre que idenrtifica al log.
-            @param mensaje {String} - Mensaje a ser escrito en el log.
-            @param nivelMensaje {Number} - Criticidad del mensaje cuyo valor debe estar en Log.NIVELES.
+            @description Ejecutar cualquier método del objeto RegLog asociado con el noombre de un log registrado en el contenedor. Si no existe objeto RegLog asociado al nombre de log, el método no hace nada. En caso de que se necesite saber específicamente qué hacer si existe objeto RegLog o no se tendrá que obtener directamente mediante ContenedorLogs[] el objeto RegLog.
 
-            @trhows {IndexError} - Si el nombreLog no existe en el contenedor.
+            @throws {MemeberError} - Si el objeto RegLog no admite el método o los argumentos.
 
-            @returns {Number} - Número de bytes escritos en el log
+            @returns Si el nombre del log no tiene asociado ningún RegLog retorna sin valor. Si tiene asociado un RegLog, devuelve el mismo valor retornado por el método.
         */
-        static EscribirLog(nombreLog, mensaje, nivelMensaje) {
-            if not this.ExisteLog(nombreLog) {
-                ErrLanzar(IndexError, "No existe ningún log con el nombre " nombreLog, ERR_ERRORES["ERR_ARG"])
-            }
+        static MetodoRegLog(nombreLog, metodo, args*) {
+            this._ComprobarArgs(Map("nombreLog", nombreLog), , , ERR_ERRORES["ERR_ARG"])
 
             regLog := this[nombreLog]
             if regLog == NULL
-                return 0
+                return
 
-            return regLog.EscribirMensaje(mensaje, nivelMensaje)
+            try {
+                return regLog.%metodo%(args*)
+            }
+            catch as e {
+                Err_Lanzar(MemberError, "Error al invocar al método " metodo ": " e.Message, ERR_ERRORES["ERR_ARG"])
+            }
         }
-
-
     }
 }
