@@ -85,7 +85,7 @@ if (!IsSet(__REGLOG_H__)) {
             catch as e
                 if REGLOG_DEBUG
                     ErrMsgBox(e)
-                ErrLanzar(OSError, "El archivo " nombreArchivo " no puede asignarse al log", ERR_ERRORES["ERR_ARCHIVO"])
+                Err_Lanzar(OSError, "El archivo " nombreArchivo " no puede asignarse al log", ERR_ERRORES["ERR_ARCHIVO"])
         }
 
         
@@ -97,7 +97,7 @@ if (!IsSet(__REGLOG_H__)) {
                 this._archivo.Close()
             }
             catch as e
-                ErrLanzar(OSError, "El archivo " this._nombreArchivo " no puede cerrarse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
+                Err_Lanzar(OSError, "El archivo " this._nombreArchivo " no puede cerrarse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
         }
 
 
@@ -110,14 +110,18 @@ if (!IsSet(__REGLOG_H__)) {
             @param {Boolean} vaciarLog - Si true se crea el archivo de log vacío (modo "w" al abrirlo); si false se abre manteniendo su contenido posicionándose al final (modo "a").
 
             @throws {OSError} - Si hay problemas al abrir el archivo.
+
+            @returns ERR_ERRORES["CORRECTO"] si se ejecuta correctamente.
         */
         AsignarArchivo(nombreArchivo, vaciarLog) {
             try 
                 this._archivo := FileOpen(nombreArchivo, vaciarLog ? "w" : "a")
             catch as e
-                ErrLanzar(OSError, "El archivo " nombreArchivo " no puede abrirse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
+                Err_Lanzar(OSError, "El archivo " nombreArchivo " no puede abrirse: " e.Message, ERR_ERRORES["ERR_ARCHIVO"])
 
             this._nombreArchivo = nombreArchivo
+
+            return ERR_ERRORES["CORRECTO"]
         }
 
 
@@ -154,13 +158,16 @@ if (!IsSet(__REGLOG_H__)) {
             @description Vaciar el contenido del archivo de Log
 
             @throws {OSError} - Si no se puede empezar la posición desde el inicio del archivo.
+
+            @returns ERR_ERRORES["CORRECTO"] si se ejecuta correctamente.
         */
         Vaciar() {
             if not this._archivo.Seek(0)
-                ErrLanzar(OSError, "Error al posicionarse al inicio del archivo", ERR_ERRORES["ERR_ARCHIVO"])
+                Err_Lanzar(OSError, "Error al posicionarse al inicio del archivo", ERR_ERRORES["ERR_ARCHIVO"])
 
             this._archivo.Length := 0      
 
+            return ERR_ERRORES["CORRECTO"]
         }
 
 
@@ -191,6 +198,7 @@ if (!IsSet(__REGLOG_H__)) {
                 "log" {RegLog} - Objeto Reglog.
                 "padre" {String} - Nombre de la etiqueta del log padre.
                 "delegar" {Boolean} - Si false el log no se usará y no se volcarán mensajes.
+            Si la clave nombreLog existe signifca que está operativo, aunque puede que no tenga asignado aún ningún RegLog y, mientras sea así, no volcará ningún dato. Si la clave nombreLog no existe significa que a través de nombreLog nunca se podrá acceder a ningún RegLog, siendo un tipo de log inexistente. Esto se hace para dar la opción de desactivar el volcado de registros a un nombreLog sin tener que tocar el código donde está indicado escribir datos en ese nombreLog. SImplemente eliminando el RegLog asociado a ese nombreLog, o cambiando a inactivo el propio RegLog asociado, ya no volcaría nada a través de ese nombreLog.
     */
     class ContenedorLogs {
 
