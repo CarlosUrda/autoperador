@@ -10,7 +10,7 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", NULL, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
@@ -34,8 +34,11 @@ if (!IsSet(__ERR_H__)) {
         @param script {String} - Nombre del archivo del script
         @param fecha {String} - Fecha del momento del error.
     */
-    _ErrLanzar(tipoExcepcion, mensaje, codigoError := ERR_ERRORES["NINGUNO"], linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptName, fecha := A_Now) {
-        throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError)
+    _ErrLanzar(tipoExcepcion, mensaje, codigoError?, linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptName, fecha := A_Now) {
+        if tipoExcepcion.Prototype is Error
+            throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError?)
+        else
+            throw TypeError("La excepción a lanzar no es válida como tipo Error.", ERR_ERRORES["ERR_ARG"])
     } 
     
     global ErrLanzar := _ErrLanzar
