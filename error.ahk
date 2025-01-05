@@ -10,7 +10,7 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5, "ERR_INDICE", -6)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
@@ -20,6 +20,7 @@ if (!IsSet(__ERR_H__)) {
         ERR_ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo")
         ERR_ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto")
         ERR_ERRORES["ERR_TIPO"], Map("nombre", "ERR_TIPO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo")
+        ERR_ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Índice o clave errónea")
     )
 
     /*
@@ -34,14 +35,14 @@ if (!IsSet(__ERR_H__)) {
         @param script {String} - Nombre del archivo del script
         @param fecha {String} - Fecha del momento del error.
     */
-    _ErrLanzar(tipoExcepcion, mensaje, codigoError?, linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptName, fecha := A_Now) {
+    _Err_Lanzar(tipoExcepcion, mensaje, codigoError?, linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptName, fecha := A_Now) {
         if tipoExcepcion.Prototype is Error
             throw tipoExcepcion(mensaje, fecha ": " funcion " (L " linea ") [" script "]", codigoError?)
         else
             throw TypeError("La excepción a lanzar no es válida como tipo Error.", ERR_ERRORES["ERR_ARG"])
     } 
     
-    global ErrLanzar := _ErrLanzar
+    global Err_Lanzar := _Err_Lanzar
 
     /*
         @function ErrMsgBox

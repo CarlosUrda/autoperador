@@ -293,6 +293,8 @@ if (!IsSet(__REGLOG_H__)) {
             @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL sin padre. Sin valor no se cambia el padre.
             @param {Boolean} delegar - true ignora el log asociado a nombreLog y usa el del padre. Sin valor no se cambia.
 
+            @returns ERR_ERRORES["CORRECTO"] si se ejecuta correctamente.
+
             @trhows {IndexError} - Si el nombre del log o del padre no existe en el contenedor.
         */
         static CambiarPadre(nombreLog, nombreLogPadre?, delegar?) {
@@ -302,6 +304,8 @@ if (!IsSet(__REGLOG_H__)) {
                 this._infoLogs[nombreLog]["padre"] := nombreLogPadre
             if IsSet(delegar)
                 this._infoLogs[nombreLog]["delegar"] := !!delegar
+
+            return ERR_ERRORES["CORRECTO"]
         }
 
 
@@ -318,11 +322,14 @@ if (!IsSet(__REGLOG_H__)) {
             @throws {TypeError} - Si el objeto Log no es de tipo RegLog
             @trhows {IndexError} - Si el nombre del padre no existe en el contenedor.
             
+            @returns ERR_ERRORES["CORRECTO"] si se ejecuta correctamente.
         */
         static AgregarLog(nombreLog, regLog := NULL, nombreLogPadre := NULL, delegar := false) {
             this._ComprobarArgs(Map("nombreLog_repe", nombreLog, "regLog", regLog, "nombreLogPadre", nombreLogPadre), , , ERR_ERRORES["ERR_ARG"])
 
             this._infoLogs[nombreLog] := Map("log", regLog, "padre", nombreLogPadre, "delegar", delegar)
+
+            return ERR_ERRORES["CORRECTO"]
         }
 
 
