@@ -3,6 +3,13 @@
 
     @description Gestión de los errores
 
+    @requires Recordatorio de excepciones que lanza ahk ante eventos:
+        - MethodError:
+            - Si objeto carece de método ToString al llamarlo en String
+        
+        - TypeError:
+            - Si un objeto a recorrer en un bucle no es Enumerator, no tiene función __Enum o ésta no devuelve un Enumerator.
+            
     @todo Solucionar el tener que pasar el número de línea en cada llamada a Err_Lanzar porque al asignarlo como valor por defecto toma el valor de la línea de la función Err_Lanzar, mientras que en el caso del nombre de la función sí toma como valor por defecto la función que le llama (aunque no es seguro que esto último lo vaya a hacer siempre)
 */
 
@@ -51,6 +58,8 @@ if (!IsSet(__ERR_H__)) {
         @param {String} funcion - Nombre de la función donde ocurre la excepción
         @param {String} script - Nombre del script desde donde se lanza el error. Por defecto se toma la ruta completa.
         @param {String} fecha - Fecha del momento del error.
+
+        @throws {TypeError} - Si alguno de los argumentos tiene un tipo incorrecto.
 
         @todo A_LineNumber como valor por defecto del argumento línea no guarda el número de línea de la llamada a esta función, sino el número de línea de la cabecera _Err_Lanzar. Para el nombre de la función y el script sí asigna el de los llamantes.
     */
