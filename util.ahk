@@ -142,8 +142,7 @@ if (!IsSet(__UTIL_H__)) {
             }
         }
         catch TypeError as e
-            Erq
-        r_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            Err_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch MethodError as e
             Err_Lanzar(e, "El valor índice " indice " de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch as e {
@@ -167,38 +166,36 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_ObtenerClaves
         
-        @description Obtener las claves o índices de un objeto enumerable <__Enum> o Enumerator de sus valores definidos. Si se pasa un valor, obtiene la clave de ese único valor. Clave (1º argumento) y Valor (2º argumento) del enumerable.
+        @description Obtener las claves o índices de un objeto enumerable <__Enum> o Enumerator asociadas con valores definidos. Si se pasa un valor, obtiene las claves asociadas con ese único valor. Clave (1º argumento) y Valor (2º argumento) del enumerable.
 
-        @param {*} valor - valor a obtener su clave. Si no se pasa se obtienen todas las claves que tengan algún valor definido.
+        @param {*} valor - valor a obtener sus claves. Si no se pasa se obtienen todas las claves que tengan algún valor definido.
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener las claves.
 
         @throws {TypeError} - Si el tipos del argumentos no es correcto.
         @throws {¿Error?} - Si la función enumerable no admite dos argumentos clave-valor.
-        @throws {ValueError} - Si el valor es pasado y no existe en la lista enumerable.
 
-        @returns {Array\Integer\String\Referencia Object} - Array de claves si no se pasa valor (pueden estar desordenadas), o una única clave del valor pasado.
+        @returns {Array} - Array de claves obtenidas
     */
     _Util_ObtenerClaves(enum, valor?) {
+        claves := []
         try {
             if (IsSet(valor)) {
                 for clave, _valor in enum 
                     if IsSet(_valor) and (_valor == valor)
-                        return clave
-
-                Err_Lanzar(ValueError, "El argumento valor no existe en la lista enumerable", ERR_ERRORES["ERR_VALOR"], A_LineNumber)
+                        claves.Push(clave)
             }
             else {
-                claves := []
-                for clave, valor in enum
-                    if IsSet(valor)
+                for clave, _valor in enum
+                    if IsSet(_valor)
                         claves.Push(clave)
-                return claves
             }
         }
         catch TypeError as e
             Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que ésta devuelva un Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch as e
-            Err_Lanzar(e, "El enumerator obtenido del argumento enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+            Err_Lanzar(e, "El enumerator de enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+
+        return claves
     }
 
     ; Se añade como método a Map y Array
@@ -242,6 +239,10 @@ if (!IsSet(__UTIL_H__)) {
 
         Set(args*) {
             super.Set(args*)
+        }
+
+        ToString() {
+            
         }
     }
 
@@ -299,6 +300,9 @@ if (!IsSet(__UTIL_H__)) {
             set {
 
             }
+        }
+
+        ToString() {
 
         }
     }
@@ -327,7 +331,7 @@ if (!IsSet(__UTIL_H__)) {
         }
         ; TypeError se captura si enum no es Enumerator, no tiene función __Enum o ésta no devuelve Enumerator
         catch TypeError as e {
-            Err_Lanzar(e, "El argumento enum debe ser Enumerator o con función __Enum que devuelva Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que devuelva Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         }
         ; Aquí solo debe entrar porque enum no admite dos argumentos.
         catch {
@@ -350,7 +354,6 @@ if (!IsSet(__UTIL_H__)) {
     /*
     - Que MapOrdenado se pueda ordenar por claves o por valores. Solo hay que comparar los valores en lugar de las claves al ordenar.
     - Hacer ToString en las nuevas clases.
-    - Función para obtener el índice o clave de un valor. ¿Modificar ContieneValor? ¿O crear nueva función que lanza excepción si no está valor, similar a cuando no hay una clave?
     - Cambiar las llamadas a Err_Lanzar cuando se capture una expeción para relanzarla.
     */
 
