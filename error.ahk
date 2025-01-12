@@ -38,24 +38,47 @@ if (!IsSet(__ERR_H__)) {
         ERR_ERRORES["ERR_FUNCION"], Map("nombre", "ERR_FUNCION", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
         ERR_ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados")
     )
+    global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2)  ; Errores establecidos en la documentación oficial
 
     /*
         @function Err_Lanzar
-        @description Encapsular el lanzamiento de excepciones para lanzarlas con contepernido predefinido
+        @description Encapsular el lanzamiento de excepciones para lanzarlas con contenido personalizado.
 
-        @param {Error} tipoExepcion - Objeto clase Error con el tipo de excepción a lanzar.
+        @param {Clase Error\Error} exepcion - Clase Error con el tipo de la nueva excepción a lanzar u objeto Error con la excepción a relanzar agregando información.
         @param {String} mensaje - Mensaje como primer argumento de la excepción lanzada
-        @param {Numbre} codigoError - Código del tipo de error ocurrido de entre los valores de ERR_ERRORES.
+        @param {Integer} codigoError - Código del tipo de error ocurrido de entre los valores de ERR_ERRORES.
         @param {Integer} linea - Número de línea donde ocurre el error 
         @param {String} funcion - Nombre de la función donde ocurre la excepción
-        @param {String} script - Nombre del archivo del script
+        @param {String} script - Nombre del script desde donde se lanza el error. Por defecto se toma la ruta completa.
         @param {String} fecha - Fecha del momento del error.
+
+        @todo A_LineNumber como valor por defecto del argumento línea no guarda el número de línea de la llamada a esta función, sino el número de línea de la cabecera _Err_Lanzar. Para el nombre de la función y el script sí asigna el de los llamantes.
     */
-    _Err_Lanzar(tipoExcepcion, mensaje, codigoError?, linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptName, fecha := A_Now) {
-        if tipoExcepcion.Prototype is Error
-            throw tipoExcepcion((IsSet(codigoError) ? "(" codigoError ") " : "") mensaje, funcion, FormatTime(fecha, "dd/MM/yyyy HH:mm:ss") ": " String(funcion) " (L " String(linea) ") [" String(script) "]")
+    _Err_Lanzar(excepcion, mensaje, codigoError := "", linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptFullPath, fecha := FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:")) {
+        try {
+            nombreArchivo := RegExReplace(String(script), ".*[\\/]", "")
+            codigoError := String(codigoError)
+            linea := String(linea)
+            funcion := String(funcion)
+            fecha := String(fecha)
+        }
+        catch  {
+            excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") Los argumentos con información sobre el error deben ser String (o convertible a String).", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
+        }
+        else if excepcion is Class
+            if !(excepcion.Prototype is Error)
+                excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El tipo de excepción a lanzar no es clase Error.", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
+            else
+                excepcion := excepcion("(" codigoError ") " mensaje, ERR_FUNCION_ORIGEN["LLAMANTE"], fecha ":" funcion " (L " linea ") [" nombreArchivo "]")
         else
-            throw TypeError("La excepción a lanzar no es válida como tipo Error.", ERR_ERRORES["ERR_ARG"])
+            if !(excepcion is Error)
+                excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El objeto excepción a relanzar no es tipo Error.", -1, FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
+            else {
+                excepcion.Message .= " (" codigoError ") " mensaje
+                excepcion.Extra .= "`r`n" fecha ":" funcion " (L " linea ") [" nombreArchivo "]"
+            }
+
+        throw excepcion
     } 
     
     global Err_Lanzar := _Err_Lanzar
