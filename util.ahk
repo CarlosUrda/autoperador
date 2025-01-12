@@ -118,9 +118,6 @@ if (!IsSet(__UTIL_H__)) {
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
     _Util_EnumerableACadena(enum, mostrarClaves := false) {
-        if (!enum.HasMethod("__Enum") and !(enum is Enumerator))
-            Err_Lanzar(TypeError, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-
         cadena := ""
 
         try {
@@ -137,57 +134,68 @@ if (!IsSet(__UTIL_H__)) {
                 }
             }
         }
+        catch TypeError as e
+            Err_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch MethodError as e
-            Err_Lanzar(MethodError, "El valor índice " indice " de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            Err_Lanzar(e, "El valor índice " indice " de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch as e {
             try
                 for valor in enum
                     cadena .= (IsSet(valor) ? String(valor) : "") "; "
             catch MethodError as e
-                Err_Lanzar(MethodError, "Un valor de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+                Err_Lanzar(e, "Un valor de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         }
         
         return RTrim(cadena, "; ")
     }
     
-    ; Se añade como método a Map y Array
+    ; Se añade como método a Map, Array y Enumerator
+    Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
     Map.Prototype.DefineProp("ToString", {Call: (enum, mostrarClaves := true) =>_Util_EnumerableACadena(enum, mostrarClaves)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
+  
 
-    
     /*
         @function Util_ObtenerClaves
         
-        @description Obtener las claves o índices de un objeto enumerable <__Enum> o Enumerator cuyos valores estén definidos.
+        @description Obtener las claves o índices de un objeto enumerable <__Enum> o Enumerator de sus valores definidos. Si se pasa un valor, obtiene la clave de ese único valor. Clave (1º argumento) y Valor (2º argumento) del enumerable.
 
+        @param {*} valor - valor a obtener su clave. Si no se pasa se obtienen todas las claves que tengan algún valor definido.
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener las claves.
 
         @throws {TypeError} - Si el tipos del argumentos no es correcto.
-        @throws {MethodError} - Si la función enumerable no admite dos argumentos clave-valor.
+        @throws {¿Error?} - Si la función enumerable no admite dos argumentos clave-valor.
+        @throws {ValueError} - Si el valor es pasado y no existe en la lista enumerable.
 
-        @returns Devuelve un Array con las claves del objeto enumerable. Las claves pueden estar desordenadas.
+        @returns {Array\Integer\String\Referencia Object} - Array de claves si no se pasa valor (pueden estar desordenadas), o una única clave del valor pasado.
     */
-    _Util_ObtenerClaves(enum) {
-        if (!enum.HasMethod("__Enum") and !(enum is Enumerator))
-            Err_Lanzar(TypeError, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+    _Util_ObtenerClaves(enum, valor?) {
+        try {
+            if (IsSet(valor)) {
+                for clave, _valor in enum 
+                    if IsSet(_valor) and (_valor == valor)
+                        return clave
 
-        claves := []
-
-        try 
-            for clave, valor in enum
-                if IsSet(valor)
-                    claves.Push(clave)
+                Err_Lanzar(ValueError, "El argumento valor no existe en la lista enumerable", ERR_ERRORES["ERR_VALOR"], A_LineNumber)
+            }
+            else {
+                claves := []
+                for clave, valor in enum
+                    if IsSet(valor)
+                        claves.Push(clave)
+                return claves
+            }
+        }
+        catch TypeError as e
+            Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que ésta devuelva un Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch as e
-            Err_Lanzar(MethodError, "El enumerator obtenido del argumento enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
-
-
-        return claves
+            Err_Lanzar(e, "El enumerator obtenido del argumento enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
     }
 
-    ; Se añade como propiedad a Map y Array
-    Map.Prototype.DefineProp("Claves", {Get: _Util_ObtenerClaves})
-    Array.Prototype.DefineProp("IndicesConValor", {Get: _Util_ObtenerClaves})
+    ; Se añade como método a Map y Array
+    Map.Prototype.DefineProp("Claves", {Call: _Util_ObtenerClaves})
+    Array.Prototype.DefineProp("IndicesConValor", {Call: _Util_ObtenerClaves})
     global Util_ObtenerClaves := _Util_ObtenerClaves
 
 
@@ -290,7 +298,7 @@ if (!IsSet(__UTIL_H__)) {
 
     /*
         @function Util_ContieneValor
-        @description Comprueba si un elemento está dentro de los valores de un objeto enumerable (Enumerator u objeto con método __Enum). En caso de admitir el enum dos argumentos, como Map o Array, comprueba los valores y no las claves o índices.
+        @description Comprueba si un elemento está dentro de los valores de un objeto enumerable (Enumerator u objeto con método __Enum). En caso de admitir el enum dos argumentos, como Map o Array, comprueba los valores (2º argumento) y no las claves o índices.
 
         @param {*} elem - valor a comprobar si está dentro de la lista.
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
@@ -304,17 +312,18 @@ if (!IsSet(__UTIL_H__)) {
         - En caso de ser enumerable no admitir dos argumentos.
     */
     _Util_ContieneValor(enum, elem) {
-        if (!enum.HasMethod("__Enum") and !(enum is Enumerator))
-            Err_Lanzar(TypeError, "El argumento enum debe ser enumerable (__Enum o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-
         try {
             for , valor in enum 
                 if IsSet(valor) and (elem == valor)
                     return true
         }
-        ; La excepción debería saltar solamente porque enum no admite dos argumentos.
+        ; TypeError se captura si enum no es Enumerator, no tiene función __Enum o ésta no devuelve Enumerator
+        catch TypeError as e {
+            Err_Lanzar(e, "El argumento enum debe ser Enumerator o con función __Enum que devuelva Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        }
+        ; Aquí solo debe entrar porque enum no admite dos argumentos.
         catch {
-            ; Aquí ya no debería lanzar más excepciones porque enum es Enumerator o __Enum y obligatoriamente tiene que tener al menos un argumento. Además, en teoría, no hay excepciones en ahk por comparar tipos distintos.
+            ; Este bucle ya no debe lanzar más excepciones porque, en teoría, no hay excepciones en ahk por comparar tipos distintos.
             for valor in enum 
                 if IsSet(valor) and (elem == valor)
                     return true
@@ -324,17 +333,17 @@ if (!IsSet(__UTIL_H__)) {
     }
 
     ; Se añade Util_ContieneValor como método a Map y Array
+    Enumerator.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
     Map.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
     Array.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
     global Util_ContieneValor := _Util_ContieneValor
 
     
     /*
-    - Dar opción a Lanzar errror para lanzar una excepción ya pasada como primer argumento y modificarla.
     - Que MapOrdenado se pueda ordenar por claves o por valores. Solo hay que comparar los valores en lugar de las claves al ordenar.
     - Hacer ToString en las nuevas clases.
     - Función para obtener el índice o clave de un valor. ¿Modificar ContieneValor? ¿O crear nueva función que lanza excepción si no está valor, similar a cuando no hay una clave?
-    - gitignore con prueba para usar include con archivos directamente
+    - Cambiar las llamadas a Err_Lanzar cuando se capture una expeción para relanzarla.
     */
 
 }
