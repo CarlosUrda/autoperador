@@ -112,47 +112,55 @@ if (!IsSet(__UTIL_H__)) {
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable cuyos valores se van a convertir a una cadena.
         @param {Boolean} mostrarClaves - Si se desean obtener las claves en la cadena 
+        @param {String} separador - cadena para separar los valores.
+        @param {String} separadorClave - cadena para separar las claves de los valores.
 
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
 
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
-    _Util_EnumerableACadena(enum, mostrarClaves := false) {
+    _Util_EnumerableACadena(enum, mostrarClaves := false, separador := ";", separadorClave := ":") {
+        try
+            separador := String(separador)
+        catch as e
+            Err_Lanzar(e, "El separador no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+
         cadena := ""
 
         try {
             if mostrarClaves {
                 for clave, valor in enum {
                     indice := clave
-                    cadena .= String(clave) ": " (IsSet(valor) ? String(valor) : "") "; "
+                    cadena .= String(clave) separadorClave " " (IsSet(valor) ? String(valor) : "") separador " "
                 }
             }
             else {
                 for i, valor in enum {
                     indice := i
-                    cadena .= IsSet(valor) ? String(valor) "; " : ""
+                    cadena .= IsSet(valor) ? String(valor) separador " " : ""
                 }
             }
         }
         catch TypeError as e
-            Err_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            Erq
+        r_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch MethodError as e
             Err_Lanzar(e, "El valor índice " indice " de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         catch as e {
             try
                 for valor in enum
-                    cadena .= (IsSet(valor) ? String(valor) : "") "; "
+                    cadena .= (IsSet(valor) ? String(valor) : "") separador " "
             catch MethodError as e
                 Err_Lanzar(e, "Un valor de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         }
         
-        return RTrim(cadena, "; ")
+        return RTrim(cadena, separador " ")
     }
     
     ; Se añade como método a Map, Array y Enumerator
     Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
-    Map.Prototype.DefineProp("ToString", {Call: (enum, mostrarClaves := true) =>_Util_EnumerableACadena(enum, mostrarClaves)})
+    Map.Prototype.DefineProp("ToString", {Call: (e, m := true, s?, sc?) =>_Util_EnumerableACadena(e, m, s?, sc?)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
   
 
