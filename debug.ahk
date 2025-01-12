@@ -1,7 +1,7 @@
 /*
     Librería para gestionar el registro de errores y sucesos en un archivo log.
 
-    @todo En GestorLog dar la opción de para un nombre de Log que su log sea NULL, ya que el nombre de log estará usado por todo el código, pero en caso de no querer usarlo no hay necesidad de crear un log desactivado, abriendo el archivo para nada.
+    @todo Cambiar Type(tipo) por is Tipo, para aceptar clases herdadas.
 */
 
 #Requires AutoHotkey v2.0
@@ -198,7 +198,7 @@ if (!IsSet(__REGLOG_H__)) {
                 "log" {RegLog} - Objeto Reglog.
                 "padre" {String} - Nombre de la etiqueta del log padre.
                 "delegar" {Boolean} - Si false el log no se usará y no se volcarán mensajes.
-            Si la clave nombreLog existe signifca que está operativo, aunque puede que no tenga asignado aún ningún RegLog y, mientras sea así, no volcará ningún dato. Si la clave nombreLog no existe significa que a través de nombreLog nunca se podrá acceder a ningún RegLog, siendo un tipo de log inexistente. Esto se hace para dar la opción de desactivar el volcado de registros a un nombreLog sin tener que tocar el código donde está indicado escribir datos en ese nombreLog. SImplemente eliminando el RegLog asociado a ese nombreLog, o cambiando a inactivo el propio RegLog asociado, ya no volcaría nada a través de ese nombreLog.
+            Si la clave nombreLog existe signifca que está operativo, aunque puede que no tenga asignado aún ningún RegLog y, mientras sea así, no volcará ningún dato. Esto se hace para dar la opción de desactivar el volcado de registros a un nombreLog sin tener que tocar el código donde se escribe datos en ese nombreLog. SImplemente eliminando el RegLog asociado a ese nombreLog, o cambiando a inactivo el propio RegLog asociado, ya no volcaría nada a través de ese nombreLog. Si la clave nombreLog no existe significa que a través de nombreLog no se puede acceder a ningún RegLog, siendo un tipo de log inexistente.
     */
     class ContenedorLogs {
 
@@ -287,7 +287,7 @@ if (!IsSet(__REGLOG_H__)) {
         /*
             @method CambiarPadre
 
-            @description Cambiar el nombre del log del padre.
+            @description Cambiar la referencia al padre de un log.
 
             @param {String} nombreLog - Nombre del log a cambiar su padre.
             @param {String} nombreLogPadre - Etiqueta para identificar al log padre. NULL sin padre. Sin valor no se cambia el padre.

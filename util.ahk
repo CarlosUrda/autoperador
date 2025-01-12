@@ -29,11 +29,11 @@ if (!IsSet(__UTIL_H__)) {
     */
     Util_SubLista(lista, filtro, modificar := false) {
         if !(lista is Array)
-            Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if !(filtro is Func)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if filtro.MinParams > 2 || filtro.MaxParams < 2
-            Err_Lanzar(TypeError, "El argumento funcion no admite dos argumentos indice y valor", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento funcion no admite dos argumentos indice y valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
 
         try {
             if modificar {
@@ -54,7 +54,7 @@ if (!IsSet(__UTIL_H__)) {
             }
         }
         catch as e
-            Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"])
+            Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)
 
     }
 
@@ -76,11 +76,11 @@ if (!IsSet(__UTIL_H__)) {
     */
     Util_SubMap(dicc, filtro, modificar := false) {
         if !(dicc is Map)
-            Err_Lanzar(TypeError, "El argumento dicc no es un Map", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento dicc no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if !(filtro is Func)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if filtro.MinParams > 2 || filtro.MaxParams < 2
-            Err_Lanzar(TypeError, "El argumento funcion filtro no admite dos argumentos clave y valor", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumento funcion filtro no admite dos argumentos clave y valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
 
         try {
             if modificar {
@@ -152,7 +152,7 @@ if (!IsSet(__UTIL_H__)) {
     
     ; Se añade como método a Map y Array
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
-    Map.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena.Bind(, true)})
+    Map.Prototype.DefineProp("ToString", {Call: (enum, mostrarClaves := true) =>_Util_EnumerableACadena(enum, mostrarClaves)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
 
     
@@ -191,6 +191,101 @@ if (!IsSet(__UTIL_H__)) {
     global Util_ObtenerClaves := _Util_ObtenerClaves
 
 
+    /*
+        @function Util_OrdenarArray
+    */
+    _Util_OrdenarArray(lista, comparar, asc := true, modificar := false) {
+        if !(lista is Array)        
+            Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+
+        if lista.Length <= 1
+            return modificar ? lista : lista.Clone()
+
+
+    }
+
+
+    /*
+        @class Util_MapOrdenado
+
+        @description 
+
+    */
+    class Util_MapOrden extends Map {
+
+        __New(comparar := (a, b) => StrCompare(String(a), String(b), true), asc := true, args*) {
+            if !(comparar is Func)
+                Err_Lanzar(TypeError, "El argumento comparar no es una función", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+
+            super._New(args*)
+            this._claves := this.Claves
+            this._comparar := comparar
+            this._asc := asc
+
+        }
+
+        Set(args*) {
+            super.Set(args*)
+        }
+    }
+
+    /*
+        @class 
+    */
+    class Util_MapValorPrioritario extends Map {
+        /*
+            @method Constructor
+
+            @param {Array|Map|Object} args - lista variable de argumentos formado por los pares clave - valor, similar a los argumentos pasados a un Map. Valor puede ser uno de los siguientes tipos:
+            - {Array} - 
+            - {Map} - 
+            - {Object} - 
+            La diferencia con Map es que valor será un array de valores ordenados por prioridad de menor a mayor (menor a mayor índice). Si valor no es un Array, se crea uno con el valor como único elemento. Si valor no está definido, se crea como valor un array vacío.
+
+            @throws Propaga los errores que pueda lanzar Map al crear el diccionario.
+        */
+        __New(args*) {
+            for i, valor in args() { ; Probar OwnProps()
+                if Mod(i, 2) != 0
+                    continue
+
+                if IsSet(valor)
+                    args[i] := Type(valor) != "Array" ? Array(valor) : valor.Clone()
+                else
+                    args[i] := Array()
+
+            }
+
+            super.__New(args*)
+        }
+
+
+        /*
+            @property __Item
+
+            @param {Integer|String|Object reference} clave - clave de acceso a una entrada de Map.
+            @param {Integer} indice - índice del array para acceder a uno de los valores. A mayor índice mayor prioridad. Si está indefinido se obtiene el valor del índice más alto (mayor prioridad).
+
+            @method
+                get -
+        */
+        __Item[clave, indice?, maxValor?] {
+            get {
+                if IsSet(indice) {
+
+                }
+                if IsSet(indice) {
+                    super[clave][indice]
+                }
+
+            }
+
+            set {
+
+            }
+
+        }
+    }
 
 
     /*
@@ -234,5 +329,13 @@ if (!IsSet(__UTIL_H__)) {
     global Util_ContieneValor := _Util_ContieneValor
 
     
+    /*
+    - Dar opción a Lanzar errror para lanzar una excepción ya pasada como primer argumento y modificarla.
+    - Que MapOrdenado se pueda ordenar por claves o por valores. Solo hay que comparar los valores en lugar de las claves al ordenar.
+    - Hacer ToString en las nuevas clases.
+    - Función para obtener el índice o clave de un valor. ¿Modificar ContieneValor? ¿O crear nueva función que lanza excepción si no está valor, similar a cuando no hay una clave?
+    - gitignore con prueba para usar include con archivos directamente
+    */
+
 }
 

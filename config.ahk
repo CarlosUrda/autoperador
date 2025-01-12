@@ -6,17 +6,32 @@ if (!IsSet(__CONFIG_H__)) {
     global __CONFIG_H__ := true
 
     /*
+        @class Config
+
+        @description Clase para gestionar todos los datos de configuración.
     */
-    global logs := Map("GENERAL", ["archivo", "padre"])
+    class Config {
+
+        class 
+        static NOMBRE_ARCHIVO_CONFIG := "config.ini"
+        static _clavesPorSeccion := Map("Seccion", Map("clave"))
+    }
 
     /*
     */
+
     _IniciarLogs() {
         for grupoLog, datosLog in logs {
             GestionLogs.crearGrupoLog(grupoLog, datosLog)
         }
 
-    global IniciarLogs := _IniciarLogs
+    CargarConfig {
 
     }
+
+    GuardarConfig {
+
+    }
+    CambiarParametro
+    ObtenerParametro
 }

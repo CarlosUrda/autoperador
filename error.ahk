@@ -74,15 +74,25 @@ if (!IsSet(__ERR_H__)) {
     /* Excepciones personalizadas */
 
     class ErrorArgumento extends Error {
-        __New(mensaje, funcion := "", codigo := "") {
+        __New(mensaje, funcion?, codigo?) {
             this.Message := mensaje
-            if (funcion != "")
+            if IsSet(funcion)
                 this.What := funcion
-            if (codigo != "")
+            if IsSet(codigo)
                 this.Extra := codigo
         }
     }
 
+
+    class ErrorFuncion extends Error {
+        __New(mensaje, funcion?, codigo?) {
+            this.Message := mensaje
+            if IsSet(funcion)
+                this.What := funcion
+            if IsSet(codigo)
+                this.Extra := codigo
+        }
+    }
 
     class ObjetoError extends Error {
     }
