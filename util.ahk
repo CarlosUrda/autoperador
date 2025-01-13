@@ -1,7 +1,9 @@
 /*
     Librería con utilidades.
 
-    @todo Incluir los mensajes de log en esta librería.
+    @todo 
+        - Incluir los mensajes de log en esta librería.
+        - Tener en cuenta que en todas las funciones donde se admite un enumerator o un objeto con método __Enum que devuelve un Enumerator para ser recorrido hay un agujero de seguridad, ya que se va a llamar a una función repetidamente en un bucle sin saber qué puede hacer dicha función. No se soluciona restringiendo los argumentos a tipos Map o Array, ya que se puede redefinir el método __Enum en el prototipo de esas clases y seguiría llamándose a la función que quiere el llamante.
 */
 
 #Requires AutoHotkey v2.0
@@ -11,6 +13,55 @@
 
 if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
+
+    /*
+        @function VerificarEnumerator
+
+        @description Comprobar que un objeto puede pasar como Enumerator siendo de tipo Func, teniendo un método Call, o un método __Enum que devuelva un Enumerator.
+
+        @param {Enumerator|Object<__Enum>} enum - Enumerator a comprobar.
+        @param {Integer} numArgs - Número de argumentos que debe admitir el Enumerator.
+
+        @returns Enumerator obtenido a partir de enum
+
+        @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
+        @throws {ErrorArgumentos} - SI el Enumerator no admite como número de argumentos numArg.
+        @throws {Error} - Si ocurre algún otro error porque enum no verifica las condiciones.
+
+        @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
+    */
+    _Util_VerificarEnumerator(enum, numArgs) {
+        if !(enum is Func) {
+            if enum.HasMethod("Call")
+                enum := enum.Call
+            else if enum.HasMethod("__Enum") {
+                try {
+                    enum := enum.__Enum(numArgs)
+                }
+                catch as e
+                    Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+
+                if !(enum is Func) 
+                    if !(enum.HasMethod("Call"))
+                        Err_Lanzar(TypeError, "El método __Enum de enum no devuelve un Enumerator", ERR_ERRORES["ERR_ARG"])
+                    else
+                        enum := enum.Call
+                }
+            else
+                Err_Lanzar(TypeError, "El argumento enum no se admite como Enumerator", ERR_ERRORES["ERR_ARG"])
+        }
+        
+        if enum.MaxParams < numArgs or enum.MinParams > numArgs {
+                Err_Lanzar(ErrorArgumentos, "El Enumerator de enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+        }
+
+        /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
+
+        return enum
+    }
+
+    global Util_VerificarEnumerator := _Util_VerificarEnumerator
+
 
 
     /*
@@ -27,31 +78,50 @@ if (!IsSet(__UTIL_H__)) {
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
         @throws {ErrorFuncion} - Si ocurre algún error con la función filtro.
     */
-    Util_SubLista(lista, filtro, modificar := false) {
-        if !(lista is Array)
-            Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+    Util_SubLista(lista, filtro, modificar := false, indice_filtro := true, valor_filtro := true) {
         if !(filtro is Func)
             Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if filtro.MinParams > 2 || filtro.MaxParams < 2
-            Err_Lanzar(TypeError, "El argumento funcion no admite dos argumentos indice y valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+/*        if filtro.MinParams > 2 || filtro.MaxParams < 2
+            Err_Lanzar(ErrorFuncion, "El argumento funcion no admite dos argumentos", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
 
-        try {
-            if modificar {
-                for i, valor in lista.Clone() 
-                    if !filtro(i, valor) 
-                        lista.RemoveAt(i)
+        if filtro.MinParams == 1 || filtro.MaxParams == 1*/
+            filtro := indice_filtro ? (i, *) => filtro(i) : (i?, v?) => filtro(v)
+        /* Hacer esto mismo para el enumerator */
 
-                return lista
+        if modificar {
+            if !(lista is Array)
+                Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+    
+            removidos := 0
+            for i, valor in lista.Clone() 
+                if !filtro(i, valor) {
+                    lista.RemoveAt(i-removidos)
+                    removidos++
+                }
+
+            return lista
+        }
+        else {
+            _lista := Array()
+
+            try {
+                if indice_filtro 
+                    for i, valor in lista 
+                        if filtro(i, valor)
+                            _lista.Push(valor)
+                else
+                    for valor in lista 
+                        ; Usar A_Index para devolver un diccionario
+                        if filtro(, valor)
+                            _lista.Push(valor)
             }
-            else {
-                _lista := Array()
+            catch TypeError as e
+                Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que ésta devuelva un Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            catch as e
+                Err_Lanzar(e, "El enumerator de enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)  
 
-                for i, valor in lista 
-                    if filtro(i, valor)
-                        _lista.Push(valor)
-
-                return _lista
-            }
+            return _lista
+        }
         }
         catch as e
             Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)

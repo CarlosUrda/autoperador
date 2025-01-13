@@ -31,11 +31,12 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_VALOR", -1, "ERR_ARG", -2, "ERR_ARCHIVO", -3, "ERR_OBJETO", -4, "ERR_TIPO", -5, "ERR_INDICE", -6, "ERR_FUNCION", -7, "ERR_NUM_ARGS", -8)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_VALOR", -2, "ERR_ARG", -3, "ERR_ARCHIVO", -4, "ERR_OBJETO", -5, "ERR_TIPO", -6, "ERR_INDICE", -7, "ERR_FUNCION", -8, "ERR_NUM_ARGS", -9)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
         ERR_ERRORES["CORRECTO"], Map("nombre", "CORRECTO", "accion", ERR_ACCIONES["CONTINUAR"], "mensaje", "Ejecución realizada correcta"),
+        ERR_ERRORES["ERR_ERROR"], Map("nombre", "ERR_ERROR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error"),
         ERR_ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
         ERR_ERRORES["ERR_ARG"], Map("nombre", "ERR_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo"),
         ERR_ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo"),
@@ -105,25 +106,13 @@ if (!IsSet(__ERR_H__)) {
 
     /* Excepciones personalizadas */
 
-    class ErrorArgumento extends Error {
-        __New(mensaje, funcion?, codigo?) {
-            this.Message := mensaje
-            if IsSet(funcion)
-                this.What := funcion
-            if IsSet(codigo)
-                this.Extra := codigo
-        }
+    class ErrorArgumentos extends Error { 
     }
 
-
     class ErrorFuncion extends Error {
-        __New(mensaje, funcion?, codigo?) {
-            this.Message := mensaje
-            if IsSet(funcion)
-                this.What := funcion
-            if IsSet(codigo)
-                this.Extra := codigo
-        }
+    }
+
+    class ErrorEnumerator extends Error {
     }
 
     class ObjetoError extends Error {
