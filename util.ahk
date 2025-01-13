@@ -4,6 +4,7 @@
     @todo 
         - Incluir los mensajes de log en esta librería.
         - Tener en cuenta que en todas las funciones donde se admite un enumerator o un objeto con método __Enum que devuelve un Enumerator para ser recorrido hay un agujero de seguridad, ya que se va a llamar a una función repetidamente en un bucle sin saber qué puede hacer dicha función. No se soluciona restringiendo los argumentos a tipos Map o Array, ya que se puede redefinir el método __Enum en el prototipo de esas clases y seguiría llamándose a la función que quiere el llamante.
+        - Las funciones que luego se definen como métodos y reciben como primer argumento el objeto this, la comprobación de dicho this es redundante para los métodos. Se podría hacer una función sin la comprobación de errores del primer argumento, y definir ésa como método para el prototipo. Y luego hacer otra función que cuomprueba el primer argumento y luego llama a ese método para ese argumento, a modo de envoltorio.
 */
 
 #Requires AutoHotkey v2.0
@@ -14,10 +15,12 @@
 if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
 
+    
     /*
         @function VerificarEnumerator
 
         @description Comprobar que un objeto puede pasar como Enumerator siendo de tipo Func, teniendo un método Call, o un método __Enum que devuelva un Enumerator.
+        En caso de obtener el Enumerator a patrir de __Enum, existe la posibilidad de que el número máximo de argumentos que admita dicho Enumerator quede definido por el valor de numArgs usado al llamar a __Enum.
 
         @param {Enumerator|Object<__Enum>} enum - Enumerator a comprobar.
         @param {Integer} numArgs - Número de argumentos que debe admitir el Enumerator.
@@ -67,7 +70,7 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubLista
 
-        @description Obtener una sublista formada con los elementos de una lista que cumplan la condición de la funcion filtro.
+        @description Obtener una sublista formada con los elementos de una lista que cumplan la condición de la funcion filtro. La lista debe ser un Array en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Array al iterar sobre ella.
 
         @param {Array} lista - Lista de la cual obtener la sublista
         @param {Func} filtro(indice, valor) - Función condición que se aplicará a cada par índice-valor de la lista. Recibirá como argumentos el índice y el valor y devolverá true o false si cumple o no la condición.
@@ -78,54 +81,50 @@ if (!IsSet(__UTIL_H__)) {
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
         @throws {ErrorFuncion} - Si ocurre algún error con la función filtro.
     */
-    Util_SubLista(lista, filtro, modificar := false, indice_filtro := true, valor_filtro := true) {
+    Util_SubLista(lista, filtro, filtra_indice := true, filtra_valor := true, modificar := false) {
         if !(filtro is Func)
             Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-/*        if filtro.MinParams > 2 || filtro.MaxParams < 2
-            Err_Lanzar(ErrorFuncion, "El argumento funcion no admite dos argumentos", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
-
-        if filtro.MinParams == 1 || filtro.MaxParams == 1*/
-            filtro := indice_filtro ? (i, *) => filtro(i) : (i?, v?) => filtro(v)
-        /* Hacer esto mismo para el enumerator */
+        if !filtra_indice and !filtra_valor
+            Err_Lanzar(ValueError, "Debe filtrar al menos por índice o por valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        if filtra_indice
+            if !filtra_valor 
+                filtro := (i, *) => filtro(i) 
+        else 
+            filtro := (i?, v?) => filtro(v)
 
         if modificar {
             if !(lista is Array)
                 Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-    
+            
+            try
+                _enum := Util_VerificarEnumerator(lista.Clone(), 2)
+            catch as e
+                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+
             removidos := 0
-            for i, valor in lista.Clone() 
+            for i, valor in _enum 
                 if !filtro(i, valor) {
                     lista.RemoveAt(i-removidos)
                     removidos++
                 }
-
-            return lista
         }
         else {
-            _lista := Array()
+            _lista := lista
+            lista := Array()
 
             try {
-                if indice_filtro 
-                    for i, valor in lista 
-                        if filtro(i, valor)
-                            _lista.Push(valor)
-                else
-                    for valor in lista 
-                        ; Usar A_Index para devolver un diccionario
-                        if filtro(, valor)
-                            _lista.Push(valor)
+                ; Usando A_Index evitamos el problema de un Enumerator con un solo argumento
+                for valor in _lista
+                    if filtro(A_Index, valor)
+                        lista.Push(valor)
             }
-            catch TypeError as e
-                Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que ésta devuelva un Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
             catch as e
-                Err_Lanzar(e, "El enumerator de enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)  
-
-            return _lista
-        }
+                ["ERR_NUM_ARGS"], A_LineNumber)  
         }
         catch as e
             Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)
 
+        return lista
     }
 
 
