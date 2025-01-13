@@ -14,6 +14,55 @@
 if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
 
+    /*
+        @function VerificarEnumerator
+
+        @description Comprobar que un objeto puede pasar como Enumerator siendo de tipo Func, teniendo un método Call, o un método __Enum que devuelva un Enumerator.
+
+        @param {Enumerator|Object<__Enum>} enum - Enumerator a comprobar.
+        @param {Integer} numArgs - Número de argumentos que debe admitir el Enumerator.
+
+        @returns Enumerator obtenido a partir de enum
+
+        @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
+        @throws {ErrorArgumentos} - SI el Enumerator no admite como número de argumentos numArg.
+        @throws {Error} - Si ocurre algún otro error porque enum no verifica las condiciones.
+
+        @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
+    */
+    _Util_VerificarEnumerator(enum, numArgs) {
+        if !(enum is Func) {
+            if enum.HasMethod("Call")
+                enum := enum.Call
+            else if enum.HasMethod("__Enum") {
+                try {
+                    enum := enum.__Enum(numArgs)
+                }
+                catch as e
+                    Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+
+                if !(enum is Func) 
+                    if !(enum.HasMethod("Call"))
+                        Err_Lanzar(TypeError, "El método __Enum de enum no devuelve un Enumerator", ERR_ERRORES["ERR_ARG"])
+                    else
+                        enum := enum.Call
+                }
+            else
+                Err_Lanzar(TypeError, "El argumento enum no se admite como Enumerator", ERR_ERRORES["ERR_ARG"])
+        }
+        
+        if enum.MaxParams < numArgs or enum.MinParams > numArgs {
+                Err_Lanzar(ErrorArgumentos, "El Enumerator de enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+        }
+
+        /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
+
+        return enum
+    }
+
+    global Util_VerificarEnumerator := _Util_VerificarEnumerator
+
+
 
     /*
         @function Util_SubLista
