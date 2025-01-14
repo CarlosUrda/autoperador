@@ -2,9 +2,14 @@
     Librería con utilidades.
 
     @todo 
-        - Incluir los mensajes de log en esta librería.
+        - Incluir los mensajes de log en esta librería. Quizás esto no es necesario y los mensajes de log los registra quien usa esta librería, como testing.
         - Tener en cuenta que en todas las funciones donde se admite un enumerator o un objeto con método __Enum que devuelve un Enumerator para ser recorrido hay un agujero de seguridad, ya que se va a llamar a una función repetidamente en un bucle sin saber qué puede hacer dicha función. No se soluciona restringiendo los argumentos a tipos Map o Array, ya que se puede redefinir el método __Enum en el prototipo de esas clases y seguiría llamándose a la función que quiere el llamante.
         - Las funciones que luego se definen como métodos y reciben como primer argumento el objeto this, la comprobación de dicho this es redundante para los métodos. Se podría hacer una función sin la comprobación de errores del primer argumento, y definir ésa como método para el prototipo. Y luego hacer otra función que cuomprueba el primer argumento y luego llama a ese método para ese argumento, a modo de envoltorio.
+        - Que MapOrdenado se pueda ordenar por claves o por valores. Solo hay que comparar los valores en lugar de las claves al ordenar.
+        - Hacer ToString en las nuevas clases.
+        - Cambiar las llamadas a Err_Lanzar venga de capturar una expeción para relanzarla. Si además capturo una excepción que he lanzado yo desde mi código no hace falta volver a meter el código de error como argumento.
+        - Hace un módulo de testing por cada librería, donde se pruebe cada función.
+
 */
 
 #Requires AutoHotkey v2.0
@@ -70,22 +75,27 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubLista
 
-        @description Obtener una sublista formada con los elementos de una lista que cumplan la condición de la funcion filtro. La lista debe ser un Array en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Array al iterar sobre ella.
+        @description Obtener una sublista formada con los elementos de una lista (índices enumerados a partir de 1) que cumplan la condición de la funcion filtro. La lista debe ser un Array en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Array al iterar sobre ella (si solo se itera sobre un argumento, obtener cada valor y no el índice).
 
         @param {Array} lista - Lista de la cual obtener la sublista
-        @param {Func} filtro(indice, valor) - Función condición que se aplicará a cada par índice-valor de la lista. Recibirá como argumentos el índice y el valor y devolverá true o false si cumple o no la condición.
+        @param {Func} filtro - Función condición que se aplicará al índice y/o valor de cada elemento. Devolverá true o false si cumple o no la condición. Si el filtro se aplica a índice y valor, el orden de los argumentos es (indice, valor).
+        @param filtra_indice - Si el filtro se aplica al índice de cada elemento.
+        @param filtra_valor - Si el filtro se aplica al valor de cada elemento.
         @param {Boolean} modificar - Si true modifica la lista pasada como argumento dejándola como la sublista. Si false, deja la lista original intacta.
 
         @returns {Array} - Sublista con los valores obtenidos. Si modificar es true devuelve la misma lista pasada por argumento modificada. Si es false, devuelve una nueva lista.
 
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
-        @throws {ErrorFuncion} - Si ocurre algún error con la función filtro.
+        @throws {Error} - Si ocurre algún otro error.
+
+        @todo Cuando se filtra por índice al modificar la lista pasada, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtra para nada. También a filtra se pasa índice inútilmente cuando se filtra por valor. El coste de solucionar código es escribir mucho más código con bucles for y llamadas a filtra específicas para cada caso, que por ahora no creo que compense.
     */
     Util_SubLista(lista, filtro, filtra_indice := true, filtra_valor := true, modificar := false) {
         if !(filtro is Func)
             Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if !filtra_indice and !filtra_valor
             Err_Lanzar(ValueError, "Debe filtrar al menos por índice o por valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        
         if filtra_indice
             if !filtra_valor 
                 filtro := (i, *) => filtro(i) 
@@ -103,26 +113,30 @@ if (!IsSet(__UTIL_H__)) {
 
             removidos := 0
             for i, valor in _enum 
-                if !filtro(i, valor) {
-                    lista.RemoveAt(i-removidos)
-                    removidos++
-                }
+                try 
+                    if !filtro(i, valor) {
+                        lista.RemoveAt(i-removidos)
+                        removidos++
+                    }
+                catch as e
+                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
         }
         else {
-            _lista := lista
+            try
+                _enum := Util_VerificarEnumerator(lista, 1)
+            catch as e
+                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+            
             lista := Array()
 
-            try {
-                ; Usando A_Index evitamos el problema de un Enumerator con un solo argumento
-                for valor in _lista
+            ; Usando A_Index evitamos el problema de un Enumerator con un solo argumento
+            for valor in _enum
+                try
                     if filtro(A_Index, valor)
                         lista.Push(valor)
-            }
-            catch as e
-                ["ERR_NUM_ARGS"], A_LineNumber)  
+                catch as e
+                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
         }
-        catch as e
-            Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)
 
         return lista
     }
@@ -132,47 +146,66 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubMap
 
-        @description Obtener un subdiccionario formado con los pares clave-valor de un diccionario que cumplan la condición de la funcion filtro.
+        @description Obtener un submap formado con los elementos de un diccionario que cumplan la condición de la funcion filtro. La lista debe ser un Map en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Map al iterar sobre ella, considerando clave y valor.
 
-        @param {Map} dicc - Diccionario de la cual obtener el submap
-        @param {Func} filtro(clave, valor) - Función filtro que se aplicará a cada par clave-valor de la lista. Recibirá como argumentos la clave y el valor y devolverá true o false si cumple o no la condición.
-        @param {Boolean} modificar - Si true modifica el map pasado como argumento dejándolo como el submap. Si false, deja el diccionaro original intacto.
+        @param {Map} dicc - Map de la cual obtener el diccionario.
+        @param {Func} filtro - Función condición que se aplicará a la clave y/o valor de cada elemento. Devolverá true o false si cumple o no la condición. Si el filtro se aplica a clave y valor, el orden de los argumentos es (clave, valor).
+        @param filtra_clave - Si el filtro se aplica a la clave de cada elemento.
+        @param filtra_valor - Si el filtro se aplica al valor de cada elemento.
+        @param {Boolean} modificar - Si true modifica el diccionario pasado como argumento dejándolo como el submap. Si false, deja el map original intacto.
 
         @returns {Map} - Submap con los valores obtenidos. Si modificar es true devuelve el mismo map pasado por argumento modificado. Si es false, devuelve un nuevo map.
 
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
-        @throws {ErrorFuncion} - Si ocurre algún error con la función filtro.
+        @throws {Error} - Si ocurre algún otro error.
+
+        @todo Cuando se filtra por clave al modificar el diccionario pasado, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtra para nada. También a filtra se pasa clave inútilmente cuando se filtra por valor. El coste de solucionar código es escribir mucho más código con bucles for y llamadas a filtra específicas para cada caso, que por ahora no creo que compense.
     */
-    Util_SubMap(dicc, filtro, modificar := false) {
-        if !(dicc is Map)
-            Err_Lanzar(TypeError, "El argumento dicc no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+   /* - Todo lo de filtra a una función.
+    - Comprobar que al eliminar un elemento de un map no afecta al bucle for.
+    */
+    Util_SubMap(dicc, filtro, filtra_clave := true, filtra_valor := true, modificar := false) {
         if !(filtro is Func)
             Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if filtro.MinParams > 2 || filtro.MaxParams < 2
-            Err_Lanzar(TypeError, "El argumento funcion filtro no admite dos argumentos clave y valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        if !filtra_clave and !filtra_valor
+            Err_Lanzar(ValueError, "Debe filtrar al menos por índice o por valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        
+        if filtra_clave
+            if !filtra_valor 
+                filtro := (i, *) => filtro(i) 
+        else 
+            filtro := (i?, v?) => filtro(v)
 
-        try {
-            if modificar {
-                for clave, valor in dicc.Clone() 
-                    if !filtro(clave, valor) 
-                        dicc.Delete(clave)
-
-                return dicc
-            }
-            else {
-                _dicc := Map()
-
-                for clave, valor in dicc 
-                    if filtro(clave, valor)
-                        _dicc[clave] := valor
-
-                return _dicc
-            }
-        }
+        try
+            _enum := Util_VerificarEnumerator(dicc, 2)
         catch as e
-            Err_Lanzar(ErrorFuncion, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)
-    }        
+            Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+    
+        if modificar {
+            if !(dicc is Map)
+                Err_Lanzar(TypeError, "El argumento lista no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            
+            for clave, valor in _enum 
+                try
+                    if !filtro(clave, valor)
+                        dicc.Delete(clave)
+                catch as e
+                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
+        }
+        else {          
+            dicc := Map()
 
+            for clave, valor in _enum
+                try
+                    if filtro(clave, valor)
+                        dicc[clave] := valor
+                catch as e
+                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
+        }
+
+        return dicc
+    }
+        
 
     /*
         @function Util_EnumerableACadena
@@ -418,13 +451,6 @@ if (!IsSet(__UTIL_H__)) {
     Map.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
     Array.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
     global Util_ContieneValor := _Util_ContieneValor
-
-    
-    /*
-    - Que MapOrdenado se pueda ordenar por claves o por valores. Solo hay que comparar los valores en lugar de las claves al ordenar.
-    - Hacer ToString en las nuevas clases.
-    - Cambiar las llamadas a Err_Lanzar cuando se capture una expeción para relanzarla.
-    */
-
+   
 }
 
