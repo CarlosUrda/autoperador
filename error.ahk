@@ -80,33 +80,130 @@ if (!IsSet(__ERR_H__)) {
                 excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El tipo de excepción a lanzar no es clase Error.", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
             else
                 excepcion := excepcion("(" codigoError ") " mensaje, ERR_FUNCION_ORIGEN["LLAMANTE"], fecha ":" funcion " (L " linea ") [" nombreArchivo "]")
-        else
-            if !(excepcion is Error)
-                excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El objeto excepción a relanzar no es tipo Error.", -1, FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
-            else {
-                excepcion.Message .= " (" codigoError ") " mensaje
-                excepcion.Extra .= "`r`n" fecha ":" funcion " (L " linea ") [" nombreArchivo "]"
-            }
+        else if !(excepcion is Error)
+            excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El objeto excepción a relanzar no es tipo Error.", -1, FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
+        else {
+            excepcion.Message .= " (" codigoError ") " mensaje
+            excepcion.Extra .= "`r`n" fecha ":" funcion " (L " linea ") [" nombreArchivo "]"
+        }
 
         throw excepcion
     } 
     
+    ; Se añade Err_Lanzar como método a Error
+    Error.Prototype.DefineProp("Lanzar", {Call: _Err_Lanzar})
     global Err_Lanzar := _Err_Lanzar
 
 
     /*
         @function ErrMsgBox
+        
         @description Mostar un mensaje MsgBox con la información de una excepcion
 
         @param {Error} e - Objeto clase Error con la información de la excepción.
     */
-    global ErrMsgBox := e => MsgBox(e.What " - " e.Message, "ERROR " e.Extra ": " ERR_INFO_CODIGOS[e.Extra]["nombre"] " - " ERR_INFO_CODIGOS[e.Extra]["mensaje"])
+    global Err_MsgBox := e => MsgBox(e.What " - " e.Message, "ERROR " e.Extra ": " ERR_INFO_CODIGOS[e.Extra]["nombre"] " - " ERR_INFO_CODIGOS[e.Extra]["mensaje"])
+
+    ; Se añade Err_MsgBox como método a Error
+    Error.Prototype.DefineProp("MsgBox", {Call: Err_MsgBox})
+
+
+    /*
+        @function Err_ClonarError
+
+        @description Clonar el contenido de un objeto Error (o extendiendo a Error) a otro objeto de otro tipo Error
+
+        @param {Error} objErrorOrigen - Objeto Error que será clonado.
+        @param {Class} tipoErrorDestino - Tipo de Error que será el nuevo objeto clonado. Si no está definido se clona el objeto origen directamente.
+
+        @returns {Error} - Objeto clonado de tipo Error.
+    */  
+    _Err_Clonar(objOrigen, tipoDestino?) {
+        if !IsSet(tipoDestino)
+            return objOrigen.Clone()
+
+        if !(objOrigen is Error) or !(tipoDestino is Class) or !(tipoDestino.Prototype is Error)
+            Err_Lanzar(TypeError, "Los argumentos deben ser de tipo Error", ERR_ERRORES["ERR_ARG"])
+
+        try
+            _enum := Err_VerificarEnumerator(objOrigen, 2)
+        catch as e
+            Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+
+        /* No sé si usar OwnProps */
+        try {
+            objDestino := tipoDestino(objOrigen.Message)
+            objDestino.What := objOrigen.What
+            objDestino.Extra := objOrigen.Extra
+            objDestino.File := objOrigen.File
+            objDestino.Line := objOrigen.Line
+            objDestino.Stack := objOrigen.Stack
+        }
+        catch as e
+            Err_Lanzar(MemoryError, "No se ha podido clonar el objeto al nuevo obk")
+
+        return objOrigen
+    }
+
+    ; Se añade Err_Clonar como método a Error
+    Error.Prototype.DefineProp("Clonar", {Call: _Err_Clonar})
+    global Err_Clonar := _Err_Clonar
+
+    /*
+        @function Err_VerificarEnumerator
+
+        @description Comprobar que un objeto puede pasar como Enumerator siendo de tipo Func, teniendo un método Call, o un método __Enum que devuelva un Enumerator.
+        En caso de obtener el Enumerator a patrir de __Enum, existe la posibilidad de que el número máximo de argumentos que admita dicho Enumerator quede definido por el valor de numArgs usado al llamar a __Enum.
+
+        @param {Enumerator|Object<__Enum>} enum - Enumerator a comprobar.
+        @param {Integer} numArgs - Número de argumentos que debe admitir el Enumerator.
+
+        @returns Enumerator obtenido a partir de enum
+
+        @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
+        @throws {ErrorArgumentos} - SI el Enumerator no admite como número de argumentos numArg.
+        @throws {Error} - Si ocurre algún otro error porque enum no verifica las condiciones.
+
+        @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
+    */
+    _Err_VerificarEnumerator(enum, numArgs) {
+        if !(enum is Func) {
+            if enum.HasMethod("Call")
+                enum := enum.Call
+            else if enum.HasMethod("__Enum") {
+                try {
+                    enum := enum.__Enum(numArgs)
+                }
+                catch as e {
+                    e := ;   ***** Clonar ErrNumArgs *****
+                    Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+                }
+
+                if !(enum is Func) 
+                    if !(enum.HasMethod("Call"))
+                        Err_Lanzar(TypeError, "El método __Enum de enum no devuelve un Enumerator", ERR_ERRORES["ERR_ARG"])
+                    else
+                        enum := enum.Call
+                }
+            else
+                Err_Lanzar(TypeError, "El argumento enum no se admite como Enumerator", ERR_ERRORES["ERR_ARG"])
+        }
+        
+        if enum.MaxParams < numArgs or enum.MinParams > numArgs {
+                Err_Lanzar(ErrorNumArgumentos, "El Enumerator de enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+        }
+
+        /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
+
+        return enum
+    }
+
+    global Err_VerificarEnumerator := _Err_VerificarEnumerator
 
     
-
     /* Excepciones personalizadas */
 
-    class ErrorArgumentos extends Error { 
+    class ErrorNumArgumentos extends Error { 
     }
 
     class ErrorFuncion extends Error {

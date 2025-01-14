@@ -20,56 +20,86 @@
 if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
 
-    
+
     /*
-        @function VerificarEnumerator
+        @function Util_AmpliarArgs
 
-        @description Comprobar que un objeto puede pasar como Enumerator siendo de tipo Func, teniendo un método Call, o un método __Enum que devuelva un Enumerator.
-        En caso de obtener el Enumerator a patrir de __Enum, existe la posibilidad de que el número máximo de argumentos que admita dicho Enumerator quede definido por el valor de numArgs usado al llamar a __Enum.
+        @description Envolver a una función para que reciba llamadas con más argumentos de los que realmente admite, de los cuales solo se elegirán los deseados que se pasarán en orden a la función real. 
 
-        @param {Enumerator|Object<__Enum>} enum - Enumerator a comprobar.
-        @param {Integer} numArgs - Número de argumentos que debe admitir el Enumerator.
+        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la llamada a la función envoltorio. Si es true, ese argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
 
-        @returns Enumerator obtenido a partir de enum
-
-        @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
-        @throws {ErrorArgumentos} - SI el Enumerator no admite como número de argumentos numArg.
-        @throws {Error} - Si ocurre algún otro error porque enum no verifica las condiciones.
-
-        @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
+        @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
     */
-    _Util_VerificarEnumerator(enum, numArgs) {
-        if !(enum is Func) {
-            if enum.HasMethod("Call")
-                enum := enum.Call
-            else if enum.HasMethod("__Enum") {
-                try {
-                    enum := enum.__Enum(numArgs)
-                }
-                catch as e
-                    Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+    Util_AmpliarArgs(funcion, flagArgs*) {
+        if !Util_EsFuncion(funcion)
+            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        if !(flagArgs is Array) or flagArgs.Length == 0
+            Err_Lanzar(TypeError, "Debes pasar un Array no vacío de valores Boolean", ERR_ERRORES["ERR_ARG"], A_LineNumber)
 
-                if !(enum is Func) 
-                    if !(enum.HasMethod("Call"))
-                        Err_Lanzar(TypeError, "El método __Enum de enum no devuelve un Enumerator", ERR_ERRORES["ERR_ARG"])
-                    else
-                        enum := enum.Call
+        _Funcion(args*) {
+            if args.Length < flagArgs.Length
+                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+
+            _args := []
+            for flag in flagArgs
+                if flag {
+                    _args.Length++
+                    if args.Has(A_Index)
+                        _args[-1] := args[A_Index]
                 }
-            else
-                Err_Lanzar(TypeError, "El argumento enum no se admite como Enumerator", ERR_ERRORES["ERR_ARG"])
-        }
-        
-        if enum.MaxParams < numArgs or enum.MinParams > numArgs {
-                Err_Lanzar(ErrorArgumentos, "El Enumerator de enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+
+            return funcion(_args*)
         }
 
-        /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
-
-        return enum
+        return _Funcion
     }
 
-    global Util_VerificarEnumerator := _Util_VerificarEnumerator
 
+    /*
+        @function Util_AmpliarArgs
+
+        @description Envolver a una función para que reciba llamadas con menos argumentos de los que realmente admite, eligiendo la posición en orden donde irán en la llamada a la función real. 
+
+        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la llamada a la función real. Si es true, ese argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
+
+        @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
+    */
+    Util_ReducirArgs(funcion, flagArgs*) {
+        if !Util_EsFuncion(funcion)
+            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+        if !(flagArgs is Array) or flagArgs.Length == 0
+            Err_Lanzar(TypeError, "Debes pasar un Array no vacío de valores Boolean", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+
+        _Funcion(args*) {
+            if args.Length < flagArgs.Length
+                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+
+            _args := []
+            for flag in flagArgs
+                if flag {
+                    _args.Length++
+                    if args.Has(A_Index)
+                        _args[-1] := args[A_Index]
+                }
+
+            return funcion(_args*)
+        }
+
+        return _Funcion
+    }
+
+        
+
+    /*
+        @function Util_EsFuncion
+
+        @description Comprobar si un objeto es o actúa como una función: es llamable.
+
+        @param {Any} f - Objeto a comprobar.
+
+        @returns true o false si es o no llamable.
+    */
+    Util_EsFuncion := f => f is Func or f.HasMethod("Call")
 
 
     /*
@@ -88,26 +118,20 @@ if (!IsSet(__UTIL_H__)) {
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
         @throws {Error} - Si ocurre algún otro error.
 
-        @todo Cuando se filtra por índice al modificar la lista pasada, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtra para nada. También a filtra se pasa índice inútilmente cuando se filtra por valor. El coste de solucionar código es escribir mucho más código con bucles for y llamadas a filtra específicas para cada caso, que por ahora no creo que compense.
+        @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
     Util_SubLista(lista, filtro, filtra_indice := true, filtra_valor := true, modificar := false) {
-        if !(filtro is Func)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if !filtra_indice and !filtra_valor
-            Err_Lanzar(ValueError, "Debe filtrar al menos por índice o por valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        
-        if filtra_indice
-            if !filtra_valor 
-                filtro := (i, *) => filtro(i) 
-        else 
-            filtro := (i?, v?) => filtro(v)
+        try
+            filtro := Util_AmpliarArgs(filtro, [filtra_indice, filtra_valor])
+        catch e
+            Err_Lanzar(e, "Función filtro no válida relacionada con filtra_indice y filtra_valor")
 
         if modificar {
             if !(lista is Array)
                 Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
             
             try
-                _enum := Util_VerificarEnumerator(lista.Clone(), 2)
+                _enum := Err_VerificarEnumerator(lista.Clone(), 2)
             catch as e
                 Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
 
@@ -123,7 +147,7 @@ if (!IsSet(__UTIL_H__)) {
         }
         else {
             try
-                _enum := Util_VerificarEnumerator(lista, 1)
+                _enum := Err_VerificarEnumerator(lista, 1)
             catch as e
                 Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
             
@@ -159,32 +183,23 @@ if (!IsSet(__UTIL_H__)) {
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
         @throws {Error} - Si ocurre algún otro error.
 
-        @todo Cuando se filtra por clave al modificar el diccionario pasado, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtra para nada. También a filtra se pasa clave inútilmente cuando se filtra por valor. El coste de solucionar código es escribir mucho más código con bucles for y llamadas a filtra específicas para cada caso, que por ahora no creo que compense.
-    */
-   /* - Todo lo de filtra a una función.
-    - Comprobar que al eliminar un elemento de un map no afecta al bucle for.
+        @todo Cuando se filtra por clave al modificar el diccionario, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa clave inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
     Util_SubMap(dicc, filtro, filtra_clave := true, filtra_valor := true, modificar := false) {
-        if !(filtro is Func)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if !filtra_clave and !filtra_valor
-            Err_Lanzar(ValueError, "Debe filtrar al menos por índice o por valor", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        
-        if filtra_clave
-            if !filtra_valor 
-                filtro := (i, *) => filtro(i) 
-        else 
-            filtro := (i?, v?) => filtro(v)
-
         try
-            _enum := Util_VerificarEnumerator(dicc, 2)
-        catch as e
-            Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
-    
+            filtro := Util_AmpliarArgs(filtro, [filtra_clave, filtra_valor])
+        catch e
+            Err_Lanzar(e, "Función filtro no válida relacionada con filtra_clave y filtra_valor")
+ 
         if modificar {
             if !(dicc is Map)
-                Err_Lanzar(TypeError, "El argumento lista no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+                Err_Lanzar(TypeError, "El argumento dicc no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
             
+            try
+                _enum := Err_VerificarEnumerator(dicc.Clone(), 2)
+            catch as e
+                Err_Lanzar(e, "El diccionario no puede ser usado como un Enumerator válido")
+
             for clave, valor in _enum 
                 try
                     if !filtro(clave, valor)
@@ -193,6 +208,11 @@ if (!IsSet(__UTIL_H__)) {
                     Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
         }
         else {          
+            try
+                _enum := Err_VerificarEnumerator(dicc, 2)
+            catch as e
+                Err_Lanzar(e, "El diccionario no puede ser usado como un Enumerator válido")
+
             dicc := Map()
 
             for clave, valor in _enum
@@ -382,7 +402,7 @@ if (!IsSet(__UTIL_H__)) {
         /*
             @property __Item
 
-            @param {Integer|String|Object reference} clave - clave de acceso a una entrada de Map.
+            @param {Integer|String|Object} clave - clave de acceso a una entrada de Map.
             @param {Integer} indice - índice del array para acceder a uno de los valores. A mayor índice mayor prioridad. Si está indefinido se obtiene el valor del índice más alto (mayor prioridad).
 
             @method
@@ -414,8 +434,8 @@ if (!IsSet(__UTIL_H__)) {
         @function Util_ContieneValor
         @description Comprueba si un elemento está dentro de los valores de un objeto enumerable (Enumerator u objeto con método __Enum). En caso de admitir el enum dos argumentos, como Map o Array, comprueba los valores (2º argumento) y no las claves o índices.
 
-        @param {*} elem - valor a comprobar si está dentro de la lista.
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
+        @param {Any} valor - valor a comprobar si está dentro del enum.
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
@@ -425,10 +445,10 @@ if (!IsSet(__UTIL_H__)) {
         - El argumento enum no ser enumerable.
         - En caso de ser enumerable no admitir dos argumentos.
     */
-    _Util_ContieneValor(enum, elem) {
+    _Util_ContieneValor(enum, valor) {
         try {
-            for , valor in enum 
-                if IsSet(valor) and (elem == valor)
+            for , _valor in enum 
+                if IsSet(_valor) and (_valor == valor)
                     return true
         }
         ; TypeError se captura si enum no es Enumerator, no tiene función __Enum o ésta no devuelve Enumerator
@@ -438,8 +458,8 @@ if (!IsSet(__UTIL_H__)) {
         ; Aquí solo debe entrar porque enum no admite dos argumentos.
         catch {
             ; Este bucle ya no debe lanzar más excepciones porque, en teoría, no hay excepciones en ahk por comparar tipos distintos.
-            for valor in enum 
-                if IsSet(valor) and (elem == valor)
+            for _valor in enum 
+                if IsSet(_valor) and (_valor == valor)
                     return true
         }
 
