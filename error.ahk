@@ -31,45 +31,65 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_VALOR", -2, "ERR_ARG", -3, "ERR_ARCHIVO", -4, "ERR_OBJETO", -5, "ERR_TIPO", -6, "ERR_INDICE", -7, "ERR_FUNCION", -8, "ERR_NUM_ARGS", -9)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_NUM_ARGS", -11)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
         ERR_ERRORES["CORRECTO"], Map("nombre", "CORRECTO", "accion", ERR_ACCIONES["CONTINUAR"], "mensaje", "Ejecución realizada correcta"),
         ERR_ERRORES["ERR_ERROR"], Map("nombre", "ERR_ERROR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error"),
-        ERR_ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
         ERR_ERRORES["ERR_ARG"], Map("nombre", "ERR_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo"),
+        ERR_ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
+        ERR_ERRORES["ERR_VALOR_ARG"], Map("nombre", "ERR_VALOR_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor de argumento erróneo"),
+        ERR_ERRORES["ERR_TIPO"], Map("nombre", "ERR_TIPO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo"),
+        ERR_ERRORES["ERR_TIPO_ARG"], Map("nombre", "ERR_TIPO_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato de argumento erróneo"),
         ERR_ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo"),
         ERR_ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto"),
-        ERR_ERRORES["ERR_TIPO"], Map("nombre", "ERR_TIPO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo"),
         ERR_ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Índice o clave errónea"),
         ERR_ERRORES["ERR_FUNCION"], Map("nombre", "ERR_FUNCION", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
         ERR_ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados")
     )
     global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2)  ; Errores establecidos en la documentación oficial
 
-    /*
-        @function Err_Lanzar
-        @description Encapsular el lanzamiento de excepciones para lanzarlas con contenido personalizado.
 
-        @param {Clase Error\Error} exepcion - Clase Error con el tipo de la nueva excepción a lanzar u objeto Error con la excepción a relanzar agregando información.
-        @param {String} mensaje - Mensaje como primer argumento de la excepción lanzada
-        @param {Integer} codigoError - Código del tipo de error ocurrido de entre los valores de ERR_ERRORES.
-        @param {Integer} linea - Número de línea donde ocurre el error 
-        @param {String} funcion - Nombre de la función donde ocurre la excepción
-        @param {String} script - Nombre del script desde donde se lanza el error. Por defecto se toma la ruta completa.
-        @param {String} fecha - Fecha del momento del error.
+    /*
+        @function Err_ExtenderInfo
+        @description Añadir información a la ya existente en una excepción. Simplemente concatena la información pasada a cada campo de la excepción correspondiente. Si una 
+
+        @param {Error} excepcion - Objeto Error con la excepción a ampliar su información.
+        @param {Map} props - Diccionario con un valor por cada propiedad que desea ser ampliado.
 
         @throws {TypeError} - Si alguno de los argumentos tiene un tipo incorrecto.
-
-        @todo A_LineNumber como valor por defecto del argumento línea no guarda el número de línea de la llamada a esta función, sino el número de línea de la cabecera _Err_Lanzar. Para el nombre de la función y el script sí asigna el de los llamantes.
     */
-    _Err_Lanzar(excepcion, mensaje, codigoError := "", linea := A_LineNumber, funcion := A_ThisFunc, script := A_ScriptFullPath, fecha := FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:")) {
+    _Err_ExtenderInfoM(excepcion, props) {
+        if !(props is Map)
+            throw Err_TipoArgError("Las propiedades deben estar en un diccionario", , , ERR_ERRORES["ERR_TIPO_ARG"], , "props", Type(props))
+
+        try {
+            _enum := Err_VerificarEnumerator(props, 2)
+        }
+        catch e
+            throw e
+
+        for prop, valor in props {
+            try {
+                if !excepcion.HasProp(prop)
+                    continue
+            }
+            catch
+                ; Si salta una excepción al saber si tiene la propiedad
+
+            try {
+                excepcion.%prop% .= " " String(valor)
+            }
+            catch as e {
+                throw Err_ValorArgError("")
+            }
+        }
+
         try {
             nombreArchivo := RegExReplace(String(script), ".*[\\/]", "")
             codigoError := String(codigoError)
-            linea := String(linea)
-            funcion := String(funcion)
+            FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:")
             fecha := String(fecha)
         }
         catch  {
@@ -90,9 +110,16 @@ if (!IsSet(__ERR_H__)) {
         throw excepcion
     } 
     
+    _Err_ExtenderInfo(excepcion, props) {
+        if !(excepcion is Error)
+            throw Err_TipoArgError("El objeto pasado no es una excepción Error", , , ERR_ERRORES["ERR_TIPO_ARG"], , "props", Type(props))
+
+        return _Err_ExtenderInfoM(excepcion, props)
+    }
+
     ; Se añade Err_Lanzar como método a Error
-    Error.Prototype.DefineProp("Lanzar", {Call: _Err_Lanzar})
-    global Err_Lanzar := _Err_Lanzar
+    Error.Prototype.DefineProp("ExtenderInfo", {Call: _Err_ExtenderInfoM})
+    global Err_ExtenderInfo := _Err_ExtenderInfo
 
 
     /*
@@ -102,7 +129,9 @@ if (!IsSet(__ERR_H__)) {
 
         @param {Error} e - Objeto clase Error con la información de la excepción.
     */
-    global Err_MsgBox := e => MsgBox(e.What " - " e.Message, "ERROR " e.Extra ": " ERR_INFO_CODIGOS[e.Extra]["nombre"] " - " ERR_INFO_CODIGOS[e.Extra]["mensaje"])
+    global Err_MsgBox := e => MsgBox(String(e), )
+    excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El tipo de excepción a lanzar no es clase Error.", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
+    nombreArchivo := RegExReplace(String(script), ".*[\\/]", "")
 
     ; Se añade Err_MsgBox como método a Error
     Error.Prototype.DefineProp("MsgBox", {Call: Err_MsgBox})
@@ -241,17 +270,194 @@ if (!IsSet(__ERR_H__)) {
     global Err_VerificarEnumerator := _Err_VerificarEnumerator
 
     
+    
     /* Excepciones personalizadas */
 
-    class ErrorNumArgumentos extends Error { 
+    /*
+        @class Err_Error
+
+        @description Error padre del que heredan todos los errores personalizados Err_
+    */
+    class Err_Error extends Error {
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
+            super.__New(mensaje, what, extra)
+
+            try {
+                this.Codigo := String(codigo)
+                this.Fecha := String(fecha)
+            }
+            catch {
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") Los argumentos deben ser String (o convertible a String).")
+            }
+
+            if FormatTime(this.Fecha) == ""
+                throw ValueError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Mensaje) " " String(texto) (Boolean(extra) ?  "'r'n" String(this.Extra) : "")
+        }
     }
 
-    class ErrorFuncion extends Error {
+    /*
+        @class ErrorArgumento
+
+        @decription Errores relacionados con los argumentos recibidos en la función o método donde ocurre el error.
+    */
+    class Err_ArgError extends Err_Error { 
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?) {
+            super.__New(mensaje, what, extra, codigo, fecha)
+
+            try {
+                this.NombreArg := String(nombreArg ?? "")
+            }
+            catch {
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento nombreArg debe ser String (o convertible a String)")
+            }
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return super.ToString("- Arg: " this.nombreArg " " texto, extra)
+        }
+        
     }
 
-    class ErrorEnumerator extends Error {
+    class Err_TipoArgError extends Err_ArgError {
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, tipoArg?) {
+            super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
+
+            try {
+                this.tipoArg := String(tipoArg ?? "")
+            }
+            catch {
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento tipoArg debe ser String (o convertible a String)")
+            }
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return super.ToString("- Tipo: " this.tipoArg " " texto, extra)
+        }
     }
 
-    class ObjetoError extends Error {
+    class Err_ValorArgError extends Err_ArgError {
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, valorArg?) {
+            super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
+
+            if IsSet(valorArg)
+                this.valorArg := valorArg
+        }
+    }
+
+    class Err_FuncError extends Err_Error {
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo?, fecha?, funcion?) {
+            super.__New(mensaje, what, extra, codigo, fecha)
+
+            try {
+                this.Funcion := String(funcion ?? "")
+            }
+            catch {
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento funcion debe ser String (o convertible a String)")
+            }
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return super.ToString("- Func: " this.Funcion " " texto, extra)
+        }
+    }
+
+    class Err_NumArgsError extends Err_FuncError { 
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si el número de argumentos no es un entero >= 0
+        */
+        __New(mensaje, what?, extra?, codigo?, fecha?, funcion?, numArgs?) {
+            super.__New(mensaje, what, extra, codigo, fecha, funcion)
+
+            if !IsSet(numArgs)
+                this.NumArgs := ""
+            else {
+                if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
+                    throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
+
+                this.NumArgs := String(numArgs)
+            }
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return super.ToString("- NumArgs: " this.numArgs " " texto, extra)
+        }
+    }
+
+    class ErrorEnumerator extends Err_FuncError {
+    }
+
+    class ErrorObjeto extends Error {
     }
 }   

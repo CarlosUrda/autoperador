@@ -33,15 +33,10 @@ if (!IsSet(__UTIL_H__)) {
 
         @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
     */
-    Util_AmpliarArgs(funcion, flagArgs*) {
-        if !Util_EsFuncion(funcion)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if !(flagArgs is Array) or flagArgs.Length == 0
-            Err_Lanzar(TypeError, "Debes pasar un Array no vacío de valores Boolean", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-
+    _Util_AmpliarArgsM(funcion, filtro) {
         _Funcion(args*) {
             if args.Length < flagArgs.Length
-                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes para ser filtrados", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
 
             _args := []
             for flag in flagArgs
@@ -51,11 +46,25 @@ if (!IsSet(__UTIL_H__)) {
                         _args[-1] := args[A_Index]
                 }
 
+            if !funcion.AdmiteNumArgs(_args.Length)
+                Err_Lanzar(ErrorNumArgumentos, "La función no admite ", _args.Length " argumentos" ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+
             return funcion(_args*)
         }
 
         return _Funcion
     }
+
+    _Util_AmpliarArgs(funcion, filtro) {
+        if !Err_EsFuncion(funcion)
+            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+
+        return _Util_AmpliarArgsM(funcion, filtro)
+    }
+
+    ; Se añade como método a Map, Array y Enumerator
+    Func.Prototype.DefineProp("AmpliarArgs", {Call: _Util_AmpliarArgsM})
+    global Util_AmpliarArgs := _Util_AmpliarArgs
 
 
     /*
@@ -105,6 +114,8 @@ if (!IsSet(__UTIL_H__)) {
         @returns {Array} - Sublista con los valores obtenidos. Si modificar es true devuelve la misma lista pasada por argumento modificada. Si es false, devuelve una nueva lista.
 
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
+        @throws {ErrorEnumerator} - Si lista no puede generar un Enumerator correcto a ser recorrido.
+        @throws {ErrorFuncion} - Si filtro genera algún error al ser ejecutado.
         @throws {Error} - Si ocurre algún otro error.
 
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
@@ -115,7 +126,7 @@ if (!IsSet(__UTIL_H__)) {
         catch TypeError as e
             Err_Lanzar(e, "Argumento filtro no es una función válida")
         else if !admiteNumArgs
-            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos índice y valor")
+            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos índice y valor", ERR_ERRORES["ERR_NUM_ARGS"])
 
         if modificar {
             if !(lista is Array)
@@ -123,8 +134,10 @@ if (!IsSet(__UTIL_H__)) {
             
             try
                 _enum := Err_VerificarEnumerator(lista.Clone(), 2)
-            catch as e
-                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+            catch as e {
+                e := e.Clonar(ErrorEnumerator)
+                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")                
+            }
 
             removidos := 0
             for i, valor in _enum 
@@ -133,14 +146,16 @@ if (!IsSet(__UTIL_H__)) {
                         lista.RemoveAt(i-removidos)
                         removidos++
                     }
-                catch as e
+                catch as e {
+                    e := e.Clonar(ErrorFuncio)
                     Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
+                }
         }
         else {
             try
                 _enum := Err_VerificarEnumerator(lista, 1)
             catch as e
-                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
+                Err_Lanzar(e, "Argumento lista no se admite como un Enumerator válido")
             
             lista := Array()
 
