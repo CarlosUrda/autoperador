@@ -149,6 +149,46 @@ if (!IsSet(__ERR_H__)) {
     Error.Prototype.DefineProp("Clonar", {Call: _Err_Clonar})
     global Err_Clonar := _Err_Clonar
 
+
+    /*
+        @function Err_EsFuncion
+
+        @description Comprobar si un objeto es o actúa como una función: es llamable.
+
+        @param {Any} f - Objeto a comprobar.
+
+        @returns true o false si es o no llamable.
+    */
+    Err_EsFuncion := f => f is Func or f.HasMethod("Call")
+
+
+    /*
+        @function Err_AdmiteNumArgs
+
+        @description Comprobar si una función admite un número de argumentos.
+
+        @param {Func} funcion - Función a comprobar.
+        @param {Func} numArgs - Número de argumentos a comprobar.
+
+        @throws {TypeError} - Si función no es llamable.
+
+        @returns true o false.
+    */
+    _Err_AdmiteNumArgs(funcion, numArgs) {
+        if !(funcion is Func)
+            if funcion.HasMethod("Call")
+                funcion := funcion.Call
+            else
+                Err_Lanzar(TypeError, "La función no es llamable", ERR_ERRORES["ERR_ARG"])
+        
+        return funcion.MaxParams >= numArgs and funcion.MinParams <= numArgs
+    }
+
+    ; Se añade como método a Map, Array y Enumerator
+    Func.Prototype.DefineProp("AdmiteNumArgs", {Call: _Err_AdmiteNumArgs})
+    global Err_AdmiteNumArgs := _Err_AdmiteNumArgs
+
+    
     /*
         @function Err_VerificarEnumerator
 
@@ -161,37 +201,37 @@ if (!IsSet(__ERR_H__)) {
         @returns Enumerator obtenido a partir de enum
 
         @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
-        @throws {ErrorArgumentos} - SI el Enumerator no admite como número de argumentos numArg.
-        @throws {Error} - Si ocurre algún otro error porque enum no verifica las condiciones.
+        @throws {ErrorNumArgumentos} - SI el Enumerator no admite como número de argumentos o no es número válido (entero >= 0).
 
         @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
     */
     _Err_VerificarEnumerator(enum, numArgs) {
-        if !(enum is Func) {
-            if enum.HasMethod("Call")
-                enum := enum.Call
-            else if enum.HasMethod("__Enum") {
-                try {
+        if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
+            Err_Lanzar(ErrorNumArgumentos, "El número de argumentos debe de ser un entero >= 0", ERR_ERRORES["ERR_ARG"])
+
+        try {
+            admiteNumArgs := Err_AdmiteNumArgs(enum, numArgs)
+        }
+        catch TypeError {
+            if enum.HasMethod("__Enum") {
+                try
                     enum := enum.__Enum(numArgs)
-                }
                 catch as e {
                     e := ;   ***** Clonar ErrNumArgs *****
                     Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
                 }
 
-                if !(enum is Func) 
-                    if !(enum.HasMethod("Call"))
-                        Err_Lanzar(TypeError, "El método __Enum de enum no devuelve un Enumerator", ERR_ERRORES["ERR_ARG"])
-                    else
-                        enum := enum.Call
-                }
+                try
+                    admiteNumArgs := Err_AdmiteNumArgs(enum, numArgs)
+                catch TypeError as es
+                    Err_Lanzar(e, "El método __Enum no devuelve un Enumerator")
             else
-                Err_Lanzar(TypeError, "El argumento enum no se admite como Enumerator", ERR_ERRORES["ERR_ARG"])
+                Err_Lanzar(TypeError, "Argumento enum no es Enumeratior ni tiene __Enum", ERR_ERRORES["ERR_ARG"])
+            }
         }
-        
-        if enum.MaxParams < numArgs or enum.MinParams > numArgs {
-                Err_Lanzar(ErrorNumArgumentos, "El Enumerator de enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
-        }
+       
+        if !admiteNumArgs
+            Err_Lanzar(ErrorNumArgumentos, "El enumerator de enum no admite el número de argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
 
         /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
 

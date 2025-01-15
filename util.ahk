@@ -24,9 +24,12 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_AmpliarArgs
 
-        @description Envolver a una función para que reciba llamadas con más argumentos de los que realmente admite, de los cuales solo se elegirán los deseados que se pasarán en orden a la función real. 
+        @description Envolver a una función en otra para recibir más argumentos de los que realmente admite, de los cuales solo se elegirán los deseados que se pasarán en orden a la función real. 
 
-        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la llamada a la función envoltorio. Si es true, ese argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
+        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la función envoltorio. Si es true, el argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
+
+        @throws {TypeError} - Si los tipos de los argumentos son erróneos.
+        @throws {ErrorNumArgumentos} - (Lanzado por la función resultante envoltorio) Si el número de flags es mayor que el número de argumentos recibidos.
 
         @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
     */
@@ -65,7 +68,7 @@ if (!IsSet(__UTIL_H__)) {
         @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
     */
     Util_ReducirArgs(funcion, flagArgs*) {
-        if !Util_EsFuncion(funcion)
+        if !Err_EsFuncion(funcion)
             Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
         if !(flagArgs is Array) or flagArgs.Length == 0
             Err_Lanzar(TypeError, "Debes pasar un Array no vacío de valores Boolean", ERR_ERRORES["ERR_ARG"], A_LineNumber)
@@ -91,26 +94,12 @@ if (!IsSet(__UTIL_H__)) {
         
 
     /*
-        @function Util_EsFuncion
-
-        @description Comprobar si un objeto es o actúa como una función: es llamable.
-
-        @param {Any} f - Objeto a comprobar.
-
-        @returns true o false si es o no llamable.
-    */
-    Util_EsFuncion := f => f is Func or f.HasMethod("Call")
-
-
-    /*
         @function Util_SubLista
 
         @description Obtener una sublista formada con los elementos de una lista (índices enumerados a partir de 1) que cumplan la condición de la funcion filtro. La lista debe ser un Array en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Array al iterar sobre ella (si solo se itera sobre un argumento, obtener cada valor y no el índice).
 
         @param {Array} lista - Lista de la cual obtener la sublista
-        @param {Func} filtro - Función condición que se aplicará al índice y/o valor de cada elemento. Devolverá true o false si cumple o no la condición. Si el filtro se aplica a índice y valor, el orden de los argumentos es (indice, valor).
-        @param filtra_indice - Si el filtro se aplica al índice de cada elemento.
-        @param filtra_valor - Si el filtro se aplica al valor de cada elemento.
+        @param {Func} filtro - Función condición que recibirá el índice y valor de cada elemento. Devolverá true o false si cumple o no la condición. 
         @param {Boolean} modificar - Si true modifica la lista pasada como argumento dejándola como la sublista. Si false, deja la lista original intacta.
 
         @returns {Array} - Sublista con los valores obtenidos. Si modificar es true devuelve la misma lista pasada por argumento modificada. Si es false, devuelve una nueva lista.
@@ -120,11 +109,13 @@ if (!IsSet(__UTIL_H__)) {
 
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    Util_SubLista(lista, filtro, filtra_indice := true, filtra_valor := true, modificar := false) {
+    Util_SubLista(lista, filtro, modificar := false) {
         try
-            filtro := Util_AmpliarArgs(filtro, [filtra_indice, filtra_valor])
-        catch e
-            Err_Lanzar(e, "Función filtro no válida relacionada con filtra_indice y filtra_valor")
+            admiteNumArgs := Err_AdmiteNumArgs(filtro, 2)
+        catch TypeError as e
+            Err_Lanzar(e, "Argumento filtro no es una función válida")
+        else if !admiteNumArgs
+            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos índice y valor")
 
         if modificar {
             if !(lista is Array)
@@ -173,9 +164,7 @@ if (!IsSet(__UTIL_H__)) {
         @description Obtener un submap formado con los elementos de un diccionario que cumplan la condición de la funcion filtro. La lista debe ser un Map en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Map al iterar sobre ella, considerando clave y valor.
 
         @param {Map} dicc - Map de la cual obtener el diccionario.
-        @param {Func} filtro - Función condición que se aplicará a la clave y/o valor de cada elemento. Devolverá true o false si cumple o no la condición. Si el filtro se aplica a clave y valor, el orden de los argumentos es (clave, valor).
-        @param filtra_clave - Si el filtro se aplica a la clave de cada elemento.
-        @param filtra_valor - Si el filtro se aplica al valor de cada elemento.
+        @param {Func} filtro - Función condición que recibirá la clave y valor de cada elemento. Devolverá true o false si cumple o no la condición. 
         @param {Boolean} modificar - Si true modifica el diccionario pasado como argumento dejándolo como el submap. Si false, deja el map original intacto.
 
         @returns {Map} - Submap con los valores obtenidos. Si modificar es true devuelve el mismo map pasado por argumento modificado. Si es false, devuelve un nuevo map.
@@ -185,11 +174,13 @@ if (!IsSet(__UTIL_H__)) {
 
         @todo Cuando se filtra por clave al modificar el diccionario, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa clave inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    Util_SubMap(dicc, filtro, filtra_clave := true, filtra_valor := true, modificar := false) {
+    Util_SubMap(dicc, filtro, modificar := false) {
         try
-            filtro := Util_AmpliarArgs(filtro, [filtra_clave, filtra_valor])
-        catch e
-            Err_Lanzar(e, "Función filtro no válida relacionada con filtra_clave y filtra_valor")
+            admiteNumArgs := Err_AdmiteNumArgs(filtro, 2)
+        catch TypeError as e
+            Err_Lanzar(e, "Argumento filtro no es una función válida")
+        else if !admiteNumArgs
+            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos clave y valor")
  
         if modificar {
             if !(dicc is Map)
