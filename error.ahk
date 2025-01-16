@@ -52,77 +52,6 @@ if (!IsSet(__ERR_H__)) {
 
 
     /*
-        @function Err_ExtenderInfo
-        @description Añadir información a la ya existente en una excepción. Simplemente concatena la información pasada a cada campo de la excepción correspondiente. Si una 
-
-        @param {Error} excepcion - Objeto Error con la excepción a ampliar su información.
-        @param {Map} props - Diccionario con un valor por cada propiedad que desea ser ampliado.
-
-        @throws {TypeError} - Si alguno de los argumentos tiene un tipo incorrecto.
-    */
-    _Err_ExtenderInfoM(excepcion, props) {
-        if !(props is Map)
-            throw Err_TipoArgError("Las propiedades deben estar en un diccionario", , , ERR_ERRORES["ERR_TIPO_ARG"], , "props", Type(props))
-
-        try {
-            _enum := Err_VerificarEnumerator(props, 2)
-        }
-        catch e
-            throw e
-
-        for prop, valor in props {
-            try {
-                if !excepcion.HasProp(prop)
-                    continue
-            }
-            catch
-                ; Si salta una excepción al saber si tiene la propiedad
-
-            try {
-                excepcion.%prop% .= " " String(valor)
-            }
-            catch as e {
-                throw Err_ValorArgError("")
-            }
-        }
-
-        try {
-            nombreArchivo := RegExReplace(String(script), ".*[\\/]", "")
-            codigoError := String(codigoError)
-            FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:")
-            fecha := String(fecha)
-        }
-        catch  {
-            excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") Los argumentos con información sobre el error deben ser String (o convertible a String).", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
-        }
-        else if excepcion is Class
-            if !(excepcion.Prototype is Error)
-                excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El tipo de excepción a lanzar no es clase Error.", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
-            else
-                excepcion := excepcion("(" codigoError ") " mensaje, ERR_FUNCION_ORIGEN["LLAMANTE"], fecha ":" funcion " (L " linea ") [" nombreArchivo "]")
-        else if !(excepcion is Error)
-            excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El objeto excepción a relanzar no es tipo Error.", -1, FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
-        else {
-            excepcion.Message .= " (" codigoError ") " mensaje
-            excepcion.Extra .= "`r`n" fecha ":" funcion " (L " linea ") [" nombreArchivo "]"
-        }
-
-        throw excepcion
-    } 
-    
-    _Err_ExtenderInfo(excepcion, props) {
-        if !(excepcion is Error)
-            throw Err_TipoArgError("El objeto pasado no es una excepción Error", , , ERR_ERRORES["ERR_TIPO_ARG"], , "props", Type(props))
-
-        return _Err_ExtenderInfoM(excepcion, props)
-    }
-
-    ; Se añade Err_Lanzar como método a Error
-    Error.Prototype.DefineProp("ExtenderInfo", {Call: _Err_ExtenderInfoM})
-    global Err_ExtenderInfo := _Err_ExtenderInfo
-
-
-    /*
         @function ErrMsgBox
         
         @description Mostar un mensaje MsgBox con la información de una excepcion
@@ -135,48 +64,6 @@ if (!IsSet(__ERR_H__)) {
 
     ; Se añade Err_MsgBox como método a Error
     Error.Prototype.DefineProp("MsgBox", {Call: Err_MsgBox})
-
-
-    /*
-        @function Err_ClonarError
-
-        @description Clonar el contenido de un objeto Error (o extendiendo a Error) a otro objeto de otro tipo Error
-
-        @param {Error} objErrorOrigen - Objeto Error que será clonado.
-        @param {Class} tipoErrorDestino - Tipo de Error que será el nuevo objeto clonado. Si no está definido se clona el objeto origen directamente.
-
-        @returns {Error} - Objeto clonado de tipo Error.
-    */  
-    _Err_Clonar(objOrigen, tipoDestino?) {
-        if !IsSet(tipoDestino)
-            return objOrigen.Clone()
-
-        if !(objOrigen is Error) or !(tipoDestino is Class) or !(tipoDestino.Prototype is Error)
-            Err_Lanzar(TypeError, "Los argumentos deben ser de tipo Error", ERR_ERRORES["ERR_ARG"])
-
-        try
-            _enum := Err_VerificarEnumerator(objOrigen, 2)
-        catch as e
-            Err_Lanzar(e, "La lista no se admite como un Enumerator válido")
-
-        /* No sé si usar OwnProps */
-        try {
-            objDestino := tipoDestino(objOrigen.Message)
-            objDestino.What := objOrigen.What
-            objDestino.Extra := objOrigen.Extra
-            objDestino.File := objOrigen.File
-            objDestino.Line := objOrigen.Line
-            objDestino.Stack := objOrigen.Stack
-        }
-        catch as e
-            Err_Lanzar(MemoryError, "No se ha podido clonar el objeto al nuevo obk")
-
-        return objOrigen
-    }
-
-    ; Se añade Err_Clonar como método a Error
-    Error.Prototype.DefineProp("Clonar", {Call: _Err_Clonar})
-    global Err_Clonar := _Err_Clonar
 
 
     /*
@@ -213,7 +100,7 @@ if (!IsSet(__ERR_H__)) {
         return funcion.MaxParams >= numArgs and funcion.MinParams <= numArgs
     }
 
-    ; Se añade como método a Map, Array y Enumerator
+    ; Se añade como método a Func
     Func.Prototype.DefineProp("AdmiteNumArgs", {Call: _Err_AdmiteNumArgs})
     global Err_AdmiteNumArgs := _Err_AdmiteNumArgs
 
@@ -280,23 +167,73 @@ if (!IsSet(__ERR_H__)) {
     */
     class Err_Error extends Error {
         /*
+            @static ExtenderErr
+
+            @description Extender un objeto excepción Error para que sea heredera de Err_Error completando las propiedades que faltan y concatenando más información a las ya existentes.
+        */
+        static ExtenderErr(excepcion, mensaje?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
+            if excepcion is Err_Error
+                throw Err_TipoArgError("La excepción ya es tipo Err_Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
+
+            if !(excepcion is Error)
+                throw Err_TipoArgError("La excepción no es tipo Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
+
+            ; Se deja que se propague cualquier excepción al no poder extender la información (estoy dentro del método que lo hace)
+            this.Extra .= IsSet(extra) ? ". " String(extra) : ""
+            this.Codigo := String(codigo)
+            this.Fecha := String(fecha)
+            if FormatTime(this.Fecha) == ""
+                throw Err_ValorArgError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") La fecha " this.Fecha " no está en formato YYYYMMDDHH24MISS", , , ERR_ERRORES["ERR_VALOR_ARG"], , "fecha", this.Fecha)
+
+            ; AQUI
+        }
+
+        /*
             @method Constructor
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
         */
         __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
-            super.__New(mensaje, what, extra)
+            super.__New(mensaje, what)
 
             try {
+                this.Extra .= IsSet(extra) ? ". " String(extra) : ""
                 this.Codigo := String(codigo)
                 this.Fecha := String(fecha)
             }
             catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") Los argumentos deben ser String (o convertible a String).")
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código, la fecha y extra deben ser String (o convertible a String).")
             }
 
             if FormatTime(this.Fecha) == ""
                 throw ValueError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")
+        }
+
+        /*
+            @method NuevasPropsCadena
+
+            @description Añade nuevas propiedades de valor que se van a guardar como tipo String. 
+
+            @param {Map} props - Diccionario con el par nombre propiedad y valor.
+            @param {Boolean} extiendeExtra - Si se quiere que las nuevas propiedades y sus valores se agreguen a la información de Extra.
+
+            @ignore No se comprueban argumentos porque es método privado y siempre es llamado solo por mí. Solo se comprueban los valores del Map ya que son obtenidos desde fuera.
+        */
+        _NuevasPropsCadena(props, extiendeExtra) {
+            _extra := ""
+
+            for prop, valor in props {
+                try {
+                    this.%prop% := String(valor)
+                    _extra .= ". " prop ": " this.%prop%
+                }
+                catch {
+                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El valor de la propiedad " prop " debe ser String (o convertible a String)")
+                }
+            }
+
+            if extiendeExtra
+                this.Extra .= _extra
         }
 
         /*
@@ -308,7 +245,7 @@ if (!IsSet(__ERR_H__)) {
             @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
         */
         ToString(texto := "", extra := false) {
-            return "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Mensaje) " " String(texto) (Boolean(extra) ?  "'r'n" String(this.Extra) : "")
+            return "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Mensaje) " " String(texto) !!extra ?  "'r'n" String(this.Extra) : ""
         }
     }
 
@@ -322,16 +259,12 @@ if (!IsSet(__ERR_H__)) {
             @method Constructor
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
+
+            @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios.
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?) {
             super.__New(mensaje, what, extra, codigo, fecha)
-
-            try {
-                this.NombreArg := String(nombreArg ?? "")
-            }
-            catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento nombreArg debe ser String (o convertible a String)")
-            }
+            super._NuevasPropsCadena(Map("nombreArg", nombreArg ?? ""), !IsSet(extra))
         }
 
         /*
@@ -356,13 +289,7 @@ if (!IsSet(__ERR_H__)) {
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, tipoArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
-
-            try {
-                this.tipoArg := String(tipoArg ?? "")
-            }
-            catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento tipoArg debe ser String (o convertible a String)")
-            }
+            super._NuevasPropsCadena(Map("tipoArg", tipoArg ?? ""), !IsSet(extra))
         }
 
         /*
@@ -383,12 +310,23 @@ if (!IsSet(__ERR_H__)) {
             @method Constructor
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
+
+            @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida.
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, valorArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
 
-            if IsSet(valorArg)
+            if IsSet(valorArg) {
                 this.valorArg := valorArg
+                try {
+                    _valorArg := String(valorArg)
+                }
+                catch { ; Si no es convertible a String solo se guarda su valor
+                }  
+                else
+                    this.Extra .= IsSet(extra) ? "" : " ValorArg: " _valorArg
+            }
+            
         }
     }
 
@@ -400,13 +338,7 @@ if (!IsSet(__ERR_H__)) {
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, funcion?) {
             super.__New(mensaje, what, extra, codigo, fecha)
-
-            try {
-                this.Funcion := String(funcion ?? "")
-            }
-            catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El argumento funcion debe ser String (o convertible a String)")
-            }
+            super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
         }
 
         /*
@@ -430,16 +362,14 @@ if (!IsSet(__ERR_H__)) {
             @throws {ValueError} - Si el número de argumentos no es un entero >= 0
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, funcion?, numArgs?) {
-            super.__New(mensaje, what, extra, codigo, fecha, funcion)
-
             if !IsSet(numArgs)
-                this.NumArgs := ""
-            else {
-                if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
-                    throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
+                numArgs := ""
+            else if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
+                throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
 
-                this.NumArgs := String(numArgs)
-            }
+
+            super.__New(mensaje, what, extra, codigo, fecha, funcion)
+            super._NuevasPropsCadena(Map("numArgs", numArgs), !IsSet(extra))
         }
 
         /*
