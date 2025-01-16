@@ -170,6 +170,13 @@ if (!IsSet(__ERR_H__)) {
             @static ExtenderErr
 
             @description Extender un objeto excepción Error para que sea heredera de Err_Error completando las propiedades que faltan y concatenando más información a las ya existentes.
+
+            @param {String} mensaje - Mensaje a concatenarse a la propiedad Message ya existente en la excepción.
+            @param {String} extra - Info extra a concatenarse a la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+
+            @returns Excepción modificada.
         */
         static ExtenderErr(excepcion, mensaje?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
             if excepcion is Err_Error
@@ -178,31 +185,40 @@ if (!IsSet(__ERR_H__)) {
             if !(excepcion is Error)
                 throw Err_TipoArgError("La excepción no es tipo Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
 
-            ; Se deja que se propague cualquier excepción al no poder extender la información (estoy dentro del método que lo hace)
+            excepcion.Base.Base := this.Prototype
+
+            ; Se deja que se propague directamente cualquier excepción al no poder extender la información de la excepción capturada (estoy dentro del método que lo hace)
+            this.Message .= IsSet(mensaje) ? ". " String(mensaje) : ""
             this.Extra .= IsSet(extra) ? ". " String(extra) : ""
             this.Codigo := String(codigo)
             this.Fecha := String(fecha)
             if FormatTime(this.Fecha) == ""
                 throw Err_ValorArgError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") La fecha " this.Fecha " no está en formato YYYYMMDDHH24MISS", , , ERR_ERRORES["ERR_VALOR_ARG"], , "fecha", this.Fecha)
 
-            ; AQUI
+            return excepcion
         }
 
         /*
             @method Constructor
 
+            @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
+            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si la fecha no tiene el formato correcto.
         */
         __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
-            super.__New(mensaje, what)
+            super.__New(mensaje, what, extra)
 
             try {
-                this.Extra .= IsSet(extra) ? ". " String(extra) : ""
                 this.Codigo := String(codigo)
                 this.Fecha := String(fecha)
             }
             catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código, la fecha y extra deben ser String (o convertible a String).")
+                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código y la fecha deben ser String (o convertible a String).")
             }
 
             if FormatTime(this.Fecha) == ""
@@ -210,7 +226,7 @@ if (!IsSet(__ERR_H__)) {
         }
 
         /*
-            @method NuevasPropsCadena
+            @method AgregaPropsCadena
 
             @description Añade nuevas propiedades de valor que se van a guardar como tipo String. 
 
@@ -219,7 +235,7 @@ if (!IsSet(__ERR_H__)) {
 
             @ignore No se comprueban argumentos porque es método privado y siempre es llamado solo por mí. Solo se comprueban los valores del Map ya que son obtenidos desde fuera.
         */
-        _NuevasPropsCadena(props, extiendeExtra) {
+        _AgregaPropsCadena(props, extiendeExtra) {
             _extra := ""
 
             for prop, valor in props {
@@ -232,7 +248,7 @@ if (!IsSet(__ERR_H__)) {
                 }
             }
 
-            if extiendeExtra
+            if !!extiendeExtra
                 this.Extra .= _extra
         }
 
@@ -258,13 +274,25 @@ if (!IsSet(__ERR_H__)) {
         /*
             @method Constructor
 
-            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
+            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
+            @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
 
-            @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios.
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?) {
+        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, posArg?) {
+            if !IsSet(posArg)
+                posArg := ""
+            else if !IsInteger(posArg) or (posArg := Integer(posArg) < 1)
+                throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número del argumento debe ser un entero >= 1")
+
             super.__New(mensaje, what, extra, codigo, fecha)
-            super._NuevasPropsCadena(Map("nombreArg", nombreArg ?? ""), !IsSet(extra))
+            super._NuevasPropsCadena(Map("NombreArg", nombreArg ?? "", "PosArg", posArg), !IsSet(extra))
         }
 
         /*
@@ -276,7 +304,7 @@ if (!IsSet(__ERR_H__)) {
             @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
         */
         ToString(texto := "", extra := false) {
-            return super.ToString("- Arg: " this.nombreArg " " texto, extra)
+            return super.ToString(". Arg: " this.NombreArg ". #: " this.PosArg ". " texto, extra)
         }
         
     }
@@ -285,10 +313,20 @@ if (!IsSet(__ERR_H__)) {
         /*
             @method Constructor
 
+            @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
+            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
+            @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
+            @param {String} tipoArg - Nombre del tipo de argumento que ha generado el error. Si son varios posibles tipos de varios argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad TipoArg
+
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, tipoArg?) {
-            super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
+        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, posArg?, tipoArg?) {
+            super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
             super._NuevasPropsCadena(Map("tipoArg", tipoArg ?? ""), !IsSet(extra))
         }
 
@@ -309,17 +347,32 @@ if (!IsSet(__ERR_H__)) {
         /*
             @method Constructor
 
-            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
+            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
+            @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
+            @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida; si está definido se la guarda el valor. Se puede pasar una lista de valores en caso de haber varios, aunque internamente no considera si son varios o un solo valor lista. Simplemente.
 
-            @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida.
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
         __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, valorArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
 
             if IsSet(valorArg) {
                 this.valorArg := valorArg
+
                 try {
-                    _valorArg := String(valorArg)
+                    if valorArg is Map
+                        _valorArg := Util_EnumerableACadena(valorArg, 2)
+                    else if valorArg is Array
+                        _valorArg := Util_EnumerableACadena(valorArg, 1)
+                    else 
+                        _valorArg := String(valorArg)
+                    VarRef
                 }
                 catch { ; Si no es convertible a String solo se guarda su valor
                 }  
@@ -367,7 +420,6 @@ if (!IsSet(__ERR_H__)) {
             else if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
                 throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
 
-
             super.__New(mensaje, what, extra, codigo, fecha, funcion)
             super._NuevasPropsCadena(Map("numArgs", numArgs), !IsSet(extra))
         }
@@ -391,3 +443,54 @@ if (!IsSet(__ERR_H__)) {
     class ErrorObjeto extends Error {
     }
 }   
+
+
+
+
+}
+
+static Extiende(obj) {
+    objB.Base.Base := ClaseAB.Prototype
+    obj.varAB := "AB"
+}
+}
+
+class ClaseB extends ClaseA {
+__New() {
+    super.__New()
+    this.varB := "B"
+}
+}
+
+
+objAB := ClaseAB()
+objB := ClaseB()
+
+MsgBox(String(objAB), "Objeto AB")
+MsgBox(String(objB), "Objeto B")
+;MsgBox(objB.Metodo())
+
+ClaseAB.Extiende(objB)
+
+MsgBox(String(objB), "Objeto B")
+MsgBox(objB.Metodo())
+
+F(&var) {
+var := 100
+}
+
+con1 := 0
+con2 := 0
+F(&con1)
+MsgBox(con1)
+
+lista := [1, 2, 3, 4]
+enum := lista.__Enum(2)
+contenedor := [VarRef().__New(), VarRef().__New()]
+contenedor.Length := 2
+;while enum(con1, con2) {
+;	MsgBox(con1 " " con2) 
+;}
+while enum(contenedor*) {
+MsgBox(contenedor[1] " " contenedor[2]) 
+}
