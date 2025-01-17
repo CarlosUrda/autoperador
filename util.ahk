@@ -20,6 +20,18 @@
 if (!IsSet(__UTIL_H__)) {
     global __UTIL_H__ := true
 
+    /*
+        @function Util_CrearVarRef
+
+        @description Obtener la referencia a una variable sin necesidad de definir la variable manualmente en el código, ya que no se permite usar %"nombre_variable"% := 0 para definir variables de manera dinámica. 
+
+        @returns {VarRef} Referencia a la variable. Para acceder al contenido usar el valor devuelto en %valor%
+    */
+    Util_CrearVarRef() {
+        variable := NULL
+        return &variable
+    }
+
 
     /*
         @function Util_AmpliarArgs
@@ -239,19 +251,26 @@ if (!IsSet(__UTIL_H__)) {
         @description Obtener una cadena a partir de los valores de objeto enumerable <__Enum> o Enumerator.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable cuyos valores se van a convertir a una cadena.
-        @param {Boolean} mostrarClaves - Si se desean obtener las claves en la cadena 
-        @param {String} separador - cadena para separar los valores.
-        @param {String} separadorClave - cadena para separar las claves de los valores.
+        @param {Boolean} numArgs - Número de argumentos que admitirá el enumerable.
+        @param {String} sepGrupo - cadena para separar los grupos de valores obtenidos en cada llamada al enumerable. Separador entre entradas.
+        @param {String} sepPartes - cadena para separar cada uno de los valores obtenidos en una llamada al enumerable. Separador entre elementos de una entrada. Si numArgs == 1 se ignora.
 
         @throws {TypeError} - Si los tipos de los argumentos no son correctos.
 
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
-    _Util_EnumerableACadena(enum, mostrarClaves := false, separador := ";", separadorClave := ":") {
-        try
-            separador := String(separador)
+    _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
+        try {
+            sepGrupo := String(sepGrupo)
+            sepPartes := String(sepPartes)
+        }
         catch as e
-            Err_Lanzar(e, "El separador no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            throw Err_Error.ExtenderErr(e, "Los separadores deben de ser una cadena", , ERR_ERRORES["ERR_TIPO_ARG"])
+        
+        /**/ */
+        if !IsInteger(posArg) or (posArg := Integer(posArg) < 1)
+            throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número del argumento debe ser un entero >= 1")
+
 
         cadena := ""
 
@@ -287,7 +306,7 @@ if (!IsSet(__UTIL_H__)) {
     ; Se añade como método a Map, Array y Enumerator
     Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
-    Map.Prototype.DefineProp("ToString", {Call: (e, m := true, s?, sc?) =>_Util_EnumerableACadena(e, m, s?, sc?)})
+    Map.Prototype.DefineProp("ToString", {Call: (e, n?, s?, sc?) =>_Util_EnumerableACadena(e, m, s?, sc?)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
   
 

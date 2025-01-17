@@ -226,7 +226,7 @@ if (!IsSet(__ERR_H__)) {
         }
 
         /*
-            @method AgregaPropsCadena
+            @method AgregarPropsCadena
 
             @description Añade nuevas propiedades de valor que se van a guardar como tipo String. 
 
@@ -235,7 +235,7 @@ if (!IsSet(__ERR_H__)) {
 
             @ignore No se comprueban argumentos porque es método privado y siempre es llamado solo por mí. Solo se comprueban los valores del Map ya que son obtenidos desde fuera.
         */
-        _AgregaPropsCadena(props, extiendeExtra) {
+        _AgregarPropsCadena(props, extiendeExtra) {
             _extra := ""
 
             for prop, valor in props {
@@ -288,11 +288,13 @@ if (!IsSet(__ERR_H__)) {
         __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, posArg?) {
             if !IsSet(posArg)
                 posArg := ""
-            else if !IsInteger(posArg) or (posArg := Integer(posArg) < 1)
+            else if !IsInteger(posArg) 
+                throw TypeError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número del argumento debe ser un entero")
+            else if (posArg := Integer(posArg)) < 1
                 throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número del argumento debe ser un entero >= 1")
 
             super.__New(mensaje, what, extra, codigo, fecha)
-            super._NuevasPropsCadena(Map("NombreArg", nombreArg ?? "", "PosArg", posArg), !IsSet(extra))
+            super._AgregarPropsCadena(Map("NombreArg", nombreArg ?? "", "PosArg", posArg), !IsSet(extra))
         }
 
         /*
@@ -417,11 +419,13 @@ if (!IsSet(__ERR_H__)) {
         __New(mensaje, what?, extra?, codigo?, fecha?, funcion?, numArgs?) {
             if !IsSet(numArgs)
                 numArgs := ""
-            else if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
+            else if !IsInteger(numArgs) 
+                throw TypeError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero")
+            else if (numArgs := Integer(numArgs)) < 0
                 throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
 
             super.__New(mensaje, what, extra, codigo, fecha, funcion)
-            super._NuevasPropsCadena(Map("numArgs", numArgs), !IsSet(extra))
+            super._AgregarPropsCadena(Map("numArgs", numArgs), !IsSet(extra))
         }
 
         /*
@@ -437,60 +441,11 @@ if (!IsSet(__ERR_H__)) {
         }
     }
 
-    class ErrorEnumerator extends Err_FuncError {
+    class Err_EnumeratorError extends Err_FuncError {
     }
 
-    class ErrorObjeto extends Error {
+    class Err_ObjetoError extends Error {
     }
 }   
 
 
-
-
-}
-
-static Extiende(obj) {
-    objB.Base.Base := ClaseAB.Prototype
-    obj.varAB := "AB"
-}
-}
-
-class ClaseB extends ClaseA {
-__New() {
-    super.__New()
-    this.varB := "B"
-}
-}
-
-
-objAB := ClaseAB()
-objB := ClaseB()
-
-MsgBox(String(objAB), "Objeto AB")
-MsgBox(String(objB), "Objeto B")
-;MsgBox(objB.Metodo())
-
-ClaseAB.Extiende(objB)
-
-MsgBox(String(objB), "Objeto B")
-MsgBox(objB.Metodo())
-
-F(&var) {
-var := 100
-}
-
-con1 := 0
-con2 := 0
-F(&con1)
-MsgBox(con1)
-
-lista := [1, 2, 3, 4]
-enum := lista.__Enum(2)
-contenedor := [VarRef().__New(), VarRef().__New()]
-contenedor.Length := 2
-;while enum(con1, con2) {
-;	MsgBox(con1 " " con2) 
-;}
-while enum(contenedor*) {
-MsgBox(contenedor[1] " " contenedor[2]) 
-}
