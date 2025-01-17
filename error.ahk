@@ -10,7 +10,13 @@
         - TypeError:
             - Si un objeto a recorrer en un bucle no es Enumerator, no tiene función __Enum o ésta no devuelve un Enumerator.
             
+    @requires El problema de lanzar excepciones desde las clases Err es que no puedo hacerlo con excepciones delas propias clases que estoy creando, tienen que ser excepciones predefeinidas.
+
     @todo Solucionar el tener que pasar el número de línea en cada llamada a Err_Lanzar porque al asignarlo como valor por defecto toma el valor de la línea de la función Err_Lanzar, mientras que en el caso del nombre de la función sí toma como valor por defecto la función que le llama (aunque no es seguro que esto último lo vaya a hacer siempre)
+    Opciones para tratar las excepciones predefinidas:
+    - Dejarlas propagarse sin hacer nada.
+    - Capturarlas y extenderlas haciéndolas formar parte de Err_Error.
+    - Capturarlas y guardarlas como una propiedad de una nueva excepción lanzada Err_Error
 */
 
 
@@ -169,7 +175,7 @@ if (!IsSet(__ERR_H__)) {
         /*
             @static ExtenderErr
 
-            @description Extender un objeto excepción Error para que sea heredera de Err_Error completando las propiedades que faltan y concatenando más información a las ya existentes.
+            @description Modificar un objeto excepción Error para que sea heredera de Err_Error y extender su información completando las propiedades que faltan y concatenando más información a las ya existentes.
 
             @param {String} mensaje - Mensaje a concatenarse a la propiedad Message ya existente en la excepción.
             @param {String} extra - Info extra a concatenarse a la propiedad Extra ya existente en la excepción.
@@ -198,6 +204,15 @@ if (!IsSet(__ERR_H__)) {
             return excepcion
         }
 
+        static _ComprobarCadena(cadena) {
+            try {
+                return String(cadena)
+            }
+            catch as e {
+                throw this.ExtenderErr(e, "(" ERR_ERRORES["ERR_TIPO_ARG"] ") La cadena debe ser String (o convertible a String)", "cadena", ERR_ERRORES["ERR_TIPO_ARG"])
+            }
+        }
+
         /*
             @method Constructor
 
@@ -212,17 +227,54 @@ if (!IsSet(__ERR_H__)) {
         */
         __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
             super.__New(mensaje, what, extra)
+            this.Codigo := codigo
+            this.Fecha := fecha
+        }
 
-            try {
-                this.Codigo := String(codigo)
-                this.Fecha := String(fecha)
-            }
-            catch {
-                throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código y la fecha deben ser String (o convertible a String).")
-            }
+        /*
+            @property Codigo
 
-            if FormatTime(this.Fecha) == ""
-                throw ValueError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")
+            @description {String} Código del tipo de error. Se deja String para dar la posibilidad de introducir letras como código.
+
+            @throws {TypeError} - El código no es String o convertible a String
+        */
+        Codigo {
+            get => this._codigo
+
+            set {
+                try {
+                    this._codigo := String(value)
+                }
+                catch {
+                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código deben ser String (o convertible a String).")
+                }
+    
+            }
+        }
+
+        /*
+            @property Fecha
+
+            @description {String} Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha..
+
+            @throws {TypeError} - La fecha no es String o convertible a String
+            @throws {ValueError} - Si la fecha no tiene el formato correcto.
+
+        */
+        Fecha {
+            get => this._fecha
+
+            set {
+                try {
+                    this._fecha := String(value)
+                }
+                catch {
+                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha deben ser String (o convertible a String).")
+                }
+        
+                if FormatTime(this._fecha) == ""
+                    throw ValueError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")    
+            }    
         }
 
         /*
@@ -235,7 +287,7 @@ if (!IsSet(__ERR_H__)) {
 
             @ignore No se comprueban argumentos porque es método privado y siempre es llamado solo por mí. Solo se comprueban los valores del Map ya que son obtenidos desde fuera.
         */
-        _AgregarPropsCadena(props, extiendeExtra) {
+        _AgregarCadena(props, extiendeExtra) {
             _extra := ""
 
             for prop, valor in props {
