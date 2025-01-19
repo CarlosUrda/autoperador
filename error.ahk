@@ -26,6 +26,8 @@
 if (!IsSet(__ERR_H__)) {
     global __ERR_H__ := true
 
+    /*** VALORES Y CÓDIGOS DE ERRORES ***/
+
     /*
         @global NULL {String} - En ahk una cadena vacía se usa como null o valor indefinido.
     */
@@ -37,7 +39,7 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_NUM_ARGS", -11)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_FUNCION_ARGS", -11, "ERR_NUM_ARGS", -12, "ERR_PROP_INDEF", -13)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
@@ -52,12 +54,18 @@ if (!IsSet(__ERR_H__)) {
         ERR_ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto"),
         ERR_ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Índice o clave errónea"),
         ERR_ERRORES["ERR_FUNCION"], Map("nombre", "ERR_FUNCION", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
-        ERR_ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados")
+        ERR_ERRORES["ERR_FUNCION_ARG"], Map("nombre", "ERR_FUNCION_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función pasada por argumento"),
+        ERR_ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados"),
+        ERR_ERRORES["ERR_PROP_INDEF"], Map("nombre", "ERR_PROP_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "La propiedad no tiene ningún valor")
     )
-    global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2)  ; Errores establecidos en la documentación oficial
+    global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3)  ; Códigos establecidos en la documentación oficial
 
+
+
+    /*** FUNCIONES DE MENSAJE DE ERRORES ***/
 
     /*
+        * Hacer un método para excepciones Err_Error *
         @function ErrMsgBox
         
         @description Mostar un mensaje MsgBox con la información de una excepcion
@@ -72,16 +80,40 @@ if (!IsSet(__ERR_H__)) {
     Error.Prototype.DefineProp("MsgBox", {Call: Err_MsgBox})
 
 
+
+    /*** FUNCIONES DE COMPROBACIÓN DE ERRORES ***/
+
     /*
-        @function Err_EsFuncion
+        @function Err_EsLlamable
 
         @description Comprobar si un objeto es o actúa como una función: es llamable.
 
-        @param {Any} f - Objeto a comprobar.
+        @param {Object} f - Objeto a comprobar.
 
         @returns true o false si es o no llamable.
     */
-    Err_EsFuncion := f => f is Func or f.HasMethod("Call")
+    Err_EsLlamable := f => f is Func or f.HasMethod("Call")
+
+
+    /*
+        @function Err_EsCadena
+
+        @description Comprobar si un objeto es cadena o es convertible a cadena (String).
+
+        @param {Object} cadena - Objeto a comprobar.
+
+        @returns true o false si es o no cadena.
+    */
+    _Err_EsCadena(cadena) {
+        try 
+            String(cadena)
+        catch
+            return false
+
+        return true
+    }
+
+    global Err_EsCadena := _Err_EsCadena
 
 
     /*
@@ -92,16 +124,13 @@ if (!IsSet(__ERR_H__)) {
         @param {Func} funcion - Función a comprobar.
         @param {Func} numArgs - Número de argumentos a comprobar.
 
-        @throws {TypeError} - Si función no es llamable.
+        @throws {TypeError} - Si no es una función.
 
         @returns true o false.
     */
     _Err_AdmiteNumArgs(funcion, numArgs) {
         if !(funcion is Func)
-            if funcion.HasMethod("Call")
-                funcion := funcion.Call
-            else
-                Err_Lanzar(TypeError, "La función no es llamable", ERR_ERRORES["ERR_ARG"])
+            Err_Lanzar(TypeError, "El argumentoo no es una función", ERR_ERRORES["ERR_ARG"])
         
         return funcion.MaxParams >= numArgs and funcion.MinParams <= numArgs
     }
@@ -164,12 +193,13 @@ if (!IsSet(__ERR_H__)) {
 
     
     
-    /* Excepciones personalizadas */
+    /*** EXCEPCIONES PERSONALIZADAS ***/
 
     /*
         @class Err_Error
 
-        @description Error padre del que heredan todos los errores personalizados Err_
+        @description Error padre del que heredan todos los errores personalizados Err_.
+        NOTA: Toda función que es llamada desde la creación de un objeto Err_Error debe tener la opción de lanzar solo errores predefinidos erroresAHK, si no puede generar un conflicto por lanzar errores Err_Error a la vez que se está creando un objeto Err_Error.
     */
     class Err_Error extends Error {
         /*
@@ -184,7 +214,7 @@ if (!IsSet(__ERR_H__)) {
 
             @returns Excepción modificada.
         */
-        static ExtenderErr(excepcion, mensaje?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
+        static ExtenderErr(excepcion, mensaje?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, erroresAHK := false) {
             if excepcion is Err_Error
                 throw Err_TipoArgError("La excepción ya es tipo Err_Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
 
@@ -196,21 +226,13 @@ if (!IsSet(__ERR_H__)) {
             ; Se deja que se propague directamente cualquier excepción al no poder extender la información de la excepción capturada (estoy dentro del método que lo hace)
             this.Message .= IsSet(mensaje) ? ". " String(mensaje) : ""
             this.Extra .= IsSet(extra) ? ". " String(extra) : ""
+            /* Comprobar siempre que el código de error es uno de los definidos, como en comprobarArgs de Debug.ahk */
             this.Codigo := String(codigo)
             this.Fecha := String(fecha)
             if FormatTime(this.Fecha) == ""
                 throw Err_ValorArgError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") La fecha " this.Fecha " no está en formato YYYYMMDDHH24MISS", , , ERR_ERRORES["ERR_VALOR_ARG"], , "fecha", this.Fecha)
 
             return excepcion
-        }
-
-        static _ComprobarCadena(cadena) {
-            try {
-                return String(cadena)
-            }
-            catch as e {
-                throw this.ExtenderErr(e, "(" ERR_ERRORES["ERR_TIPO_ARG"] ") La cadena debe ser String (o convertible a String)", "cadena", ERR_ERRORES["ERR_TIPO_ARG"])
-            }
         }
 
         /*
@@ -221,35 +243,17 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la fecha no tiene el formato correcto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, errorAHK?) {
             super.__New(mensaje, what, extra)
+            this.DefinePropCadena("Codigo", true)
             this.Codigo := codigo
             this.Fecha := fecha
-        }
-
-        /*
-            @property Codigo
-
-            @description {String} Código del tipo de error. Se deja String para dar la posibilidad de introducir letras como código.
-
-            @throws {TypeError} - El código no es String o convertible a String
-        */
-        Codigo {
-            get => this._codigo
-
-            set {
-                try {
-                    this._codigo := String(value)
-                }
-                catch {
-                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El código deben ser String (o convertible a String).")
-                }
-    
-            }
+            this.ExcepAHK := errorAHK
         }
 
         /*
@@ -269,39 +273,12 @@ if (!IsSet(__ERR_H__)) {
                     this._fecha := String(value)
                 }
                 catch {
-                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha deben ser String (o convertible a String).")
+                    throw this.ExtenderErr(e, "(" ERR_ERRORES["ERR_TIPO_ARG"] ") lA fecha debe ser String (o convertible a String)", , ERR_ERRORES["ERR_TIPO_ARG"])
                 }
         
                 if FormatTime(this._fecha) == ""
-                    throw ValueError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")    
+                    throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") La fecha no está en formato YYYYMMDDHH24MISS")    
             }    
-        }
-
-        /*
-            @method AgregarPropsCadena
-
-            @description Añade nuevas propiedades de valor que se van a guardar como tipo String. 
-
-            @param {Map} props - Diccionario con el par nombre propiedad y valor.
-            @param {Boolean} extiendeExtra - Si se quiere que las nuevas propiedades y sus valores se agreguen a la información de Extra.
-
-            @ignore No se comprueban argumentos porque es método privado y siempre es llamado solo por mí. Solo se comprueban los valores del Map ya que son obtenidos desde fuera.
-        */
-        _AgregarCadena(props, extiendeExtra) {
-            _extra := ""
-
-            for prop, valor in props {
-                try {
-                    this.%prop% := String(valor)
-                    _extra .= ". " prop ": " this.%prop%
-                }
-                catch {
-                    throw TypeError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") El valor de la propiedad " prop " debe ser String (o convertible a String)")
-                }
-            }
-
-            if !!extiendeExtra
-                this.Extra .= _extra
         }
 
         /*
@@ -331,13 +308,14 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, posArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ARG"], fecha?, errorAHK?, nombreArg?, posArg?) {
             if !IsSet(posArg)
                 posArg := ""
             else if !IsInteger(posArg) 
@@ -372,6 +350,7 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
             @param {String} tipoArg - Nombre del tipo de argumento que ha generado el error. Si son varios posibles tipos de varios argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad TipoArg
@@ -379,7 +358,7 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, posArg?, tipoArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_TIPO_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, tipoArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
             super._NuevasPropsCadena(Map("tipoArg", tipoArg ?? ""), !IsSet(extra))
         }
@@ -406,6 +385,7 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
             @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida; si está definido se la guarda el valor. Se puede pasar una lista de valores en caso de haber varios, aunque internamente no considera si son varios o un solo valor lista. Simplemente.
@@ -413,8 +393,8 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, nombreArg?, valorArg?) {
-            super.__New(mensaje, what, extra, codigo, fecha, nombreArg)
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_VALOR_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, valorArg?) {
+            super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
 
             if IsSet(valorArg) {
                 this.valorArg := valorArg
@@ -437,13 +417,37 @@ if (!IsSet(__ERR_H__)) {
         }
     }
 
+    class Err_FuncArgError extends Err_ArgError {
+        /*
+            @method Constructor
+
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+        */
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, funcion?) {
+            super.__New(mensaje, what, extra, codigo, fecha, errorAHK, nombreArg, posArg)
+            super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
+        }
+
+        /*
+            @method ToString
+
+            @description Convertir la información de la excepción a una cadena String.
+
+            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+        */
+        ToString(texto := "", extra := false) {
+            return super.ToString("- Func: " this.Funcion " " texto, extra)
+        }
+    }
+
     class Err_FuncError extends Err_Error {
         /*
             @method Constructor
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, funcion?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION"], fecha?, errorAHK?, funcion?) {
             super.__New(mensaje, what, extra, codigo, fecha)
             super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
         }
@@ -468,7 +472,7 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si el número de argumentos no es un entero >= 0
         */
-        __New(mensaje, what?, extra?, codigo?, fecha?, funcion?, numArgs?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_NUM_ARGS"], fecha?, errorAHK?, funcion?, numArgs?) {
             if !IsSet(numArgs)
                 numArgs := ""
             else if !IsInteger(numArgs) 
