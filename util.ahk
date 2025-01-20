@@ -25,11 +25,46 @@
 
 #Requires AutoHotkey v2.0
 
+/* En lugar del include se llamaría (dentro de Util??) a la función del módulo para ejecutarla, y solo se ejecutaría en teoría una vez si está en la librería */
 #Include "error.ahk"
 
+;if (!IsSet(__UTIL_H__)) {
+;    global __UTIL_H__ := true
 
-if (!IsSet(__UTIL_H__)) {
-    global __UTIL_H__ := true
+Util() {
+    static ejecutado := false
+    if ejecutado
+        return
+    ejecutado := true
+
+    /*
+        @function Util_CambiarPadre        
+    */
+    _Util_CambiarPadreM(obj, nuevoPadre, antiguoPadre?, erroresAHK := false) {
+
+        Util_VerificarArgPrv(nuevoPadre, "nuevoPadre", 1, Es_Object(o) => o is Object, , , erroresAHK)
+        Util_VerificarArgPrv(antiguoPadre, "antiguoPadre", 1, Es_Object, , , erroresAHK)
+       
+        if obj.Prototype.Base == nuevoPadre
+            return obj
+        
+        if obj.Prototype.Base == Error.Prototype
+            tipoErrorAHK.Prototype.Base := this.Prototype
+        else
+            protoripo := tipoErrorAHK.Prototype.Base            
+
+    }
+    
+    _Util_CambiarPadre(obj, nuevoPadre, antiguoPadre?) {
+        Util_VerificarArgPrv(obj, "obj", 1, EsObject(o) => o is Object)
+        
+        return obj.CambiarPadre(nuevoPadre, antiguoPadre)
+    }
+
+    ; Se añade como método a Object
+    Object.Prototype.DefineProp("CambiarPadre", {Call: _Util_CambiarPadreM})
+    global Util_CambiarPadre := _Util_CambiarPadre
+
 
     /*
         @function Util_CrearVarRef
@@ -51,14 +86,18 @@ if (!IsSet(__UTIL_H__)) {
 
         @description Obtener el nombre de la función llamante de la actual que llama a esta propia función.
 
-        @returns Nombre de la función llamante de la actual.
+        @throws {UnsetError} - Si no existe función llamante, como en el caso de invocar esta función desde un ámbito global de script.
+
+        @returns {String} - Nombre de la función llamante de la actual.
     */
     _Util_Llamante() {
         try {
-            throw Error(, ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+            throw Error( , ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
         }
         catch Error as e {
-           return e.What
+            if e.What == String(ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+                throw Err_Error.ExtenderErr(UnsetError("No existe función llamante")) 
+            return e.What
         }
     }
 
@@ -66,32 +105,70 @@ if (!IsSet(__UTIL_H__)) {
 
 
     /*
-        @function Util_VerificarArg
+        @function Util_VerificarArgPrv
 
+        @description Verificar un argumento para comprobar si es válido y cumple ciertas condiciones de tipo y valor. Solo comprueba el valor del argumento y no hace ninguna verificación del resto de parámetros, por lo que ESTA FUNCIÓN SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
+
+        @param {Object} valorArg - Valor del argumento a comprobar.
+        @param {String} nombreArg - Nombre del argumento.
+        @param {Integer} posArg - Posición del argumento.
+        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
+        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
+        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación. NOTA: No se comprueba si lanza algún error.
+        @param {Boolean} erroresAHK - Si se desea que el método lance solo errores predefinidos.
+
+        @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
+
+        @throws {TypeError/Err_TipoArgError} - Si el valorArg no es de tipo correcto.        
+        @throws {ValueError/Err_ValorArgError} - Si el valorArg no ecumple la validación.
     */
-    _Util_VerificarArg(valorArg, nombreArg, posArg?, comprobarTipo?, validarValor?, convertirValor?, erroresAHK := false) {
-        if Util_Llamante() != "_Util_VerificarArg" {
-            if IsSet(nombreArg)
-                _Util_VerificarArg(nombreArg, "nombreArg", 2, EsString(s) => Err_EsCadena(s), , String, erroresAHK)
-            if IsSet(posArg)
-                _Util_VerificarArg(posArg, "posArg", 3, IsInteger, Entero_mayor_que_1(v) => v >= 1, , erroresAHK)
-            if IsSet(comprobarTipo)
-                _Util_VerificarArg(comprobarTipo, "comprobarTipo", 4, EsFuncion(f) => f is Func, , , erroresAHK)
-            _Util_VerificarArg(validarValor, "validarValor", 5, EsFuncion, , , erroresAHK)
-            _Util_VerificarArg(validarValor, "convertirValor", 5, EsFuncion, , , erroresAHK)
-        }
-
+    _Util_VerificarArgPrv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?, erroresAHK := false) {
         if IsSet(comprobarTipo) and !comprobarTipo(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") El tipo del valor no cumple " comprobarTipo.Name
-            throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
+            mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") "
+            try 
+                mensaje .= comprobarTipo.Mensaje
+            catch 
+                mensaje .= "El tipo del valor no cumple " comprobarTipo.Name
+            throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"], , erroresAHK)
         }
         else if IsSet(validarValor) and !validarValor(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") El valor no cumple la validación de " validarValor.Name
-            throw !erroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") "
+            try 
+                mensaje .= validarValor.Mensaje
+            catch   
+                mensaje .= "El valor no cumple la validación de " validarValor.Name
+            throw !erroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"], , erroresAHK)
         }
 
         return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
+    }
 
+    global Util_VerificarArgPrv := _Util_VerificarArgPrv
+
+
+    /*
+        @function Util_VerificarArg
+
+    */
+    _Util_VerificarArg(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
+        if IsSet(nombreArg)
+            _Util_VerificarArgPrv(nombreArg, "nombreArg", 2, EsString(s) => Err_EsCadena(s), , String)
+        if IsSet(posArg)
+            _Util_VerificarArgPrv(posArg, "posArg", 3, IsInteger, Entero_mayor_que_1(v) => v >= 1, )
+        if IsSet(comprobarTipo) {
+            _Util_VerificarArgPrv(comprobarTipo, "comprobarTipo", 4, EsFuncion(f) => f is Func, , )
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
+        }
+        if IsSet(validarValor) {
+            _Util_VerificarArgPrv(validarValor, "validarValor", 5, EsFuncion, , )
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
+        }
+        if IsSet(convertirValor) {
+            _Util_VerificarArgPrv(convertirValor, "convertirValor", 6, EsFuncion, , )
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
+        }
+
+        return _Util_VerificarArgPrv(valorArg, nombreArg, posArg, comprobarTipo, validarValor, convertirValor)
     }
 
     global Util_VerificarArg := _Util_VerificarArg
@@ -100,9 +177,9 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_DefinePropEstandar
 
-        @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad valor interna. 
-        - Get lanzará PropertyError si el valor interno no ha sido definido. 
-        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación.
+        @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad. Si no hereda la propiedad, la crea como una nueva usando una propiedad valor interna para guardar el valor. Si hereda la propiedad, respeta su comportamiento en el padre.
+        - Get lanzará PropertyError si el valor interno no ha sido definido y la propiedad get no es heredada. Si hereda set pero no get, respetará el comportamiento heredado no pudiendo devolver el valor, solo guardarlo.
+        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no hereda la propiedad lo guarda en una propiedad valor interna. Si hereda set lo guarda usaándolo. Si hereda get y no set lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación.
 
         @param {String} prop - Nombre de la propiedad.
         @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. NOTA: No se comprueba si lanza algún error.
@@ -111,63 +188,51 @@ if (!IsSet(__UTIL_H__)) {
         @param {Boolean} erroresAHK - Si se desea que el método lance solo errores predefinidos.
 
         @throws {TypeError/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
+
+        @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
     _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?, erroresAHK := false) {
-        if !Err_EsCadena(prop) 
-            argumento := Map("nombre", "prop", "numero", 2, "tipo", "String", "error", ERR_ERRORES["ERR_TIPO_ARG"])
-        else if IsSet(comprobarTipo) {
-            if !(comprobarTipo is Func)
-                argumento := Map("nombre", "comprobarTipo", "numero", 3, "tipo", "Func", "error", ERR_ERRORES["ERR_TIPO_ARG"])
-            else {
-                /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
-            }
+        if IsSet(prop)
+            _Util_VerificarArgPrv(prop, "prop", 1, Es_String(s) => Err_EsCadena(s), , String, erroresAHK)
+        if IsSet(comprobarTipo) {
+            _Util_VerificarArgPrv(comprobarTipo, "comprobarTipo", 2, Es_Funcion(f) => f is Func, , , erroresAHK)
+            
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
-        if !IsSet(argumento) and IsSet(validarValor) {
-            if !(validarValor is Func)
-                argumento := Map("nombre", "validarValor", "numero", 4, "tipo", "Func", "error", ERR_ERRORES["ERR_TIPO_ARG"])
-            else {
-                /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
-            }
+        if IsSet(validarValor) {
+            _Util_VerificarArgPrv(validarValor, "validarValor", 3, Es_Funcion, , , erroresAHK)
+            
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
         }
-        if !IsSet(argumento) and IsSet(convertirValor) {
-            if !(convertirValor is Func)
-                argumento := Map("nombre", "convertirValor", "numero", 5, "tipo", "Func", "error", ERR_ERRORES["ERR_TIPO_ARG"])
-            else {
-                /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
-            }
-        }
-
-        if IsSet(argumento) {
-            switch argumento["error"] {
-                case ERR_ERRORES["ERR_TIPO_ARG"]:
-                    mensaje := "(" argumento["error"] ") El argumento " argumento["nombre"] " debe ser " argumento["tipo"] 
-                    throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , argumento["nombre"], argumento["numero"], Type(prop)) : Err_Error.ExtenderErr(Type(mensaje), , , argumento["error"])
-
-                /* Si la verificación de las funciones generan otros errores se considerarían aquí */
-            }
+        if IsSet(convertirValor) {
+            _Util_VerificarArgPrv(convertirValor, "convertirValor", 4, Es_Funcion, , , erroresAHK)
+            
+            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
 
         _Get(_obj) {
-            if !_obj.HasProp(%"_" prop%)
-                throw Err_Error.ExtenderErr(PropertyError("La propiedad " prop " no tiene ningún valor"), , , ERR_ERRORES["ERR_PROP_INDEF"]) 
-            
-            return _obj.%"_" prop%
+            try 
+                return _obj.%"_" prop%
+
+            try
+                return _obj.Base.Base.%prop%
+            catch
+                throw Err_Error.ExtenderErr(PropertyError("La propiedad " prop " no tiene aún ningún valor definido"))
         }
 
         _Set(_obj, valor) {
-            if IsSet(comprobarTipo) and !comprobarTipo(valor) {
-                mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") El tipo del valor no cumple " comprobarTipo.Name
-                throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , "value", 2, Type(valor)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
-            }
-            else if IsSet(comprobarTipo) and !validarValor(valor) {
-                mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") El valor no cumple la validación de " validarValor.Name
-                throw !erroresAHK ? Err_ValorArgError(mensaje, , , , , , "value", 2, valor) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-            }
+            valorVerficado := _Util_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor, erroresAHK)
 
-            return (_obj.%"_" prop% := IsSet(convertirValor) ? convertirValor(valor) : valor)
+            if !_obj.Base.Base.HasProp(prop)
+                return (_obj.%"_" prop% := valorVerficado)
+            
+            try
+                return (_obj.Base.Base.%prop% := valorVerficado)
+            catch
+                throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor en la propiedad " prop))
         }
 
-        obj.DefineProp(prop, {Get: _Get, Set: _Set})
+        return obj.DefineProp(prop, {Get: _Get, Set: _Set})
     }
 
     _Util_DefinePropEstandar(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
@@ -180,82 +245,6 @@ if (!IsSet(__UTIL_H__)) {
     ; Se añade como método a Object
     Object.Prototype.DefineProp("DefinePropEstandar", {Call: _Util_DefinePropEstandarM})
     global Util_DefinePropEstandar := _Util_DefinePropEstandar
-
-
-    /*
-        @function Util_DefinePropEntero
-
-        @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad valor interna de tipo entero. 
-        - Get devolverá "" si el valor cadena interno no ha sido definido. 
-        - Set guardará el valor comprobando que es una cadena y pasa un filtro (opcional). Lanza MethodError/Err_TipoArgError si el valor no es cadena o convertible a String; ValueError/Err_ValorError si el valor no pasa el filtro; cualquier otro error predefinido/Err_FuncError si existe algún error al llamar a filtro(value)
-
-        @param {String} prop - Nombre de la propiedad.
-        @param {Func} filtro - Función filtro que se aplica al valor a ser guardado en la propiedad dentro de Set. El nombre de la función debe ser descriptivo ya que aparecerá en el mensaje de error. Devolverá true o false dependiendo si el valor pasa el filtro o no.
-        @param {Boolean} erroresAHK - Si se desea que el método lance solo errores predefinidos.
-
-        @throws {MethodError/Err_TipoArgError} - Si la propiedad no es String o convertible a String
-        @throws {TypeError/Err_TipoArgError} - Si el filtro no es una función
-        */
-    _Util_DefinePropEnteroM(obj, prop, filtro?, erroresAHK := false) {
-        try {
-            prop := String(prop)                
-        }
-        catch as e {
-            mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") El nombre de la propiedad debe ser String (o convertible a String)"
-            throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , e, "prop", 2, Type(prop)) : Err_Error.ExtenderErr(e, mensaje, , ERR_ERRORES["ERR_TIPO_ARG"])
-        }
-
-        if IsSet(filtro) 
-            if !(filtro is Func) {
-                mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") El filtro debe ser una función"
-                throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , "filtro", 3, Type(filtro)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
-            }
-            else {
-                /* Aquí se verificaría la función para comprobar que no es maliciosa */
-            }
-    
-        _Get(_obj) {
-            if !_obj.HasProp(%"_" prop%)
-                throw Err_Error.ExtenderErr(PropertyError("La propiedad " prop " no tiene ningún valor"), , , ERR_ERRORES["ERR_PROP_INDEF"]) 
-            
-            return _obj.%"_" prop%
-        }
-
-        _Set(_obj, valor) {
-            if !IsInteger(valor) {
-                mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") El valor de " prop " debe ser Entero (o convertible a Integer)"
-                throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , e, "value", 2, Type(valor)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
-            }
-   
-            if IsSet(filtro) {
-                try {
-                    if !filtro(valor) {
-                        mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") El valor de " prop " no pasa el filtro " filtro.Name
-                        throw !erroresAHK ? Err_ValorArgError(mensaje, , , , , , "value", 2, valor) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-                    }
-                }
-                catch as e {
-                    mensaje := "(" ERR_ERRORES["ERR_FUNCION_ARG"] ") La función " filtro.Name " pasada por filtro ha generado un error"
-                    throw !erroresAHK ? Err_FuncError(mensaje, , , , , e, filtro.Name) : Err_Error.ExtenderErr(e, mensaje, , ERR_ERRORES["ERR_FUNCION"]) 
-                }
-            }
-
-            _obj.%"_" prop% := Integer(valor)
-        }
-
-        obj.DefineProp(prop, {Get: _Get, Set: _Set})
-    }
-
-    _Util_DefinePropCadena(obj, prop, filtro?) {
-        if !(obj is Object)
-            throw Err_TipoArgError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") Debes pasar un Object para definir la nueva propiedad", , , ERR_ERRORES["ERR_TIPO_ARG"], , , "obj", 1, Type(obj))
-
-        return obj.DefinePropCadena(prop, filtro)
-    }
-
-    ; Se añade como método a Object
-    Object.Prototype.DefineProp("DefinePropCadena", {Call: _Util_DefinePropCadenaM})
-    global Util_DefinePropCadena := _Util_DefinePropCadena
 
     
     /*

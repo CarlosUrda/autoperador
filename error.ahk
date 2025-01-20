@@ -39,7 +39,7 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_FUNCION_ARGS", -11, "ERR_NUM_ARGS", -12, "ERR_PROP_INDEF", -13)
+    global ERR_ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_FUNCION_ARG", -11, "ERR_NUM_ARGS", -12, "ERR_INDEF", -13, "ERR_PROP_INDEF", -14, "ERR_MIEMBRO_INDEF", -15, "ERR_METODO_INDEF", -16, "ERR_CLAVE_INDEF", -17, "ERR_MEMORIA", -18, "ERR_OS", -19, "ERR_VENTANA", -20, "ERR_TIEMPO_RESPUESTA", -21, "ERR_DIV0", -22)
     global ERR_ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
     global ERR_INFO_CODIGOS := Map(
         ERR_ERRORES["NULL"], Map("nombre", "NULL", "accion", ERR_ACCIONES["NULL"], "mensaje", NULL),
@@ -52,14 +52,23 @@ if (!IsSet(__ERR_H__)) {
         ERR_ERRORES["ERR_TIPO_ARG"], Map("nombre", "ERR_TIPO_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato de argumento erróneo"),
         ERR_ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo"),
         ERR_ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto"),
-        ERR_ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Índice o clave errónea"),
+        ERR_ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Índice erróneo o sin valor definido"),
         ERR_ERRORES["ERR_FUNCION"], Map("nombre", "ERR_FUNCION", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
         ERR_ERRORES["ERR_FUNCION_ARG"], Map("nombre", "ERR_FUNCION_ARG", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función pasada por argumento"),
         ERR_ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados"),
-        ERR_ERRORES["ERR_PROP_INDEF"], Map("nombre", "ERR_PROP_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "La propiedad no tiene ningún valor")
+        ERR_ERRORES["ERR_INDEF"], Map("nombre", "ERR_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Valor no definido"),
+        ERR_ERRORES["ERR_PROP_INDEF"], Map("nombre", "ERR_PROP_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "La propiedad no tiene ningún valor"),
+        ERR_ERRORES["ERR_MIEMBRO_INDEF"], Map("nombre", "ERR_MIEMBRO_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el miembro"),
+        ERR_ERRORES["ERR_METODO_INDEF"], Map("nombre", "ERR_METODO_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el método"),
+        ERR_ERRORES["ERR_CLAVE_INDEF"], Map("nombre", "ERR_CLAVE_INDEF", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el elemento indexado por clave"),
+        ERR_ERRORES["ERR_MEMORIA"], Map("nombre", "ERR_MEMORIA", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error de memoria"),
+        ERR_ERRORES["ERR_OS"], Map("nombre", "ERR_OS", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error del S.O."),
+        ERR_ERRORES["ERR_VENTANA"], Map("nombre", "ERR_VENTANA", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Error de ventana o de alguno de sus componentes"),
+        ERR_ERRORES["ERR_TIEMPO_RESPUESTA"], Map("nombre", "ERR_TIEMPO_RESPUESTA", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "Tiempo de respuesta agotado"),
+        ERR_ERRORES["ERR_DIV0"], Map("nombre", "ERR_DIV0", "accion", ERR_ACCIONES["PARAR_FUNCION"], "mensaje", "División por 0")
     )
     global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3)  ; Códigos establecidos en la documentación oficial
-
+    global ERR_ERRORES_AHK := Map(MemoryError, ERR_ERRORES["ERR_MEMORIA"], OSError, ERR_ERRORES["ERR_OS"], TargetError, ERR_ERRORES["ERR_VENTANA"], TimeOutError, ERR_ERRORES["ERR_TIEMPO_RESPUESTA"], TypeError, ERR_ERRORES["ERR_TIPO"], UnsetError, ERR_ERRORES["ERR_INDEF"], MemberError, ERR_ERRORES["ERR_MIEMBRO_INDEF"], PropertyError, ERR_ERRORES["ERR_PROP_INDEF"], MethodError, ERR_ERRORES["ERR_METODO_INDEF"], UnsetItemError, ERR_ERRORES["ERR_CLAVE_INDEF"], ValueError, ERR_ERRORES["ERR_VALOR"], IndexError, ERR_ERRORES["ERR_INDICE"], ZeroDivisionError, ERR_ERRORES["ERR_DIV0"]) ; Código por defecto asociado a cada Error AHK
 
 
     /*** FUNCIONES DE MENSAJE DE ERRORES ***/
@@ -199,9 +208,36 @@ if (!IsSet(__ERR_H__)) {
         @class Err_Error
 
         @description Error padre del que heredan todos los errores personalizados Err_.
-        NOTA: Toda función que es llamada desde la creación de un objeto Err_Error debe tener la opción de lanzar solo errores predefinidos erroresAHK, si no puede generar un conflicto por lanzar errores Err_Error a la vez que se está creando un objeto Err_Error.
+        NOTA: Toda función que es llamada durante la creación de un objeto Err_Error debe tener la opción de lanzar solo errores predefinidos erroresAHK, si no puede generar un conflicto por lanzar errores Err_Error a la vez que se está creando un objeto Err_Error.
     */
     class Err_Error extends Error {
+        static __New() {
+            /* Se añaden las propiedades nuevas al prototipo de Err_Error */
+            this.Prototype.DefinePropEstandar("Message", Es_String(s) => Err_EsCadena(s), , String, true)
+            ;this.Prototype.DefinePropEstandar("What", Es_String, , String, true) ; Mejor dejar What como está porque no se sabe muy bien qué formato admite
+            this.Prototype.DefinePropEstandar("Extra", Es_String, , String, true)
+
+            ValidarCodigo(c) => ERR_ERRORES.ContieneValor(c)
+            ValidarCodigo.Mensaje := "El código de error no está incluido en la lista de códigos"
+            this.Prototype.DefinePropEstandar("Codigo", IsInteger, , Integer, true)
+
+            ValidarFecha(f) => FormatTime(f) != ""
+            ValidarFecha.Mensaje := "La fecha no está en un formato YYYYMMDDHH24MISS"
+            this.Prototype.DefinePropEstandar("Fecha", Es_String, ValidarFecha, String, true)
+
+            ComprobarError(e) => e is Error
+            ComprobarError.Mensaje := "La excepción tiene que ser tipo Error"
+            ExisteErrorAHK(e) => ERR_ERRORES_AHK.Has(e)
+            ExisteErrorAHK.Mensaje := "La excepción no es una de las predefinidas por AHK"
+            this.Prototype.DefinePropEstandar("ErrorAHK", ComprobarError, ExisteErrorAHK, String, true)
+
+            /* Hacer que toda la jerarquía de errores predefinidos cuelgue de Err_Error */
+            for tipoErrorAHK in ERR_ERRORES_AHK {
+                tipoErrorAHK.CambiarPadre(this.Prototype, Error.Prototype)
+            }
+        }
+
+
         /*
             @static ExtenderErr
 
@@ -213,27 +249,26 @@ if (!IsSet(__ERR_H__)) {
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
 
             @returns Excepción modificada.
+
+            @event Vigilar posibles bucles al llamar a esta función. SIempre que la usemos nosotros hacerlo con una excepción que no vaya a lanzar errores por modificar sus campos.
         */
-        static ExtenderErr(excepcion, mensaje?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, erroresAHK := false) {
-            if excepcion is Err_Error
-                throw Err_TipoArgError("La excepción ya es tipo Err_Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
+        static ExtenderErr(excepcion, mensaje?, extra?, codigo?, fecha := A_Now, erroresAHK := false) {
+            ComprobarError(e) => e is Error
+            ComprobarError.Mensaje := "La excepción tiene que ser tipo Error"
+            ExisteErrorAHK(e) => ERR_ERRORES_AHK.Has(e)
+            ExisteErrorAHK.Mensaje := "La excepción no es una de las predefinidas por AHK"
+            excepcion := Util_VerificarArgPrv(excepcion, "excepcion", 1, ComprobarError, ExisteErrorAHK, , erroresAHK)
 
-            if !(excepcion is Error)
-                throw Err_TipoArgError("La excepción no es tipo Error", , "Arg: excepcion; Tipo: " Type(excepcion), ERR_ERRORES["ERR_TIPO_ARG"], , "excepcion", Type(excepcion))
-
-            excepcion.Base.Base := this.Prototype
-
-            ; Se deja que se propague directamente cualquier excepción al no poder extender la información de la excepción capturada (estoy dentro del método que lo hace)
-            this.Message .= IsSet(mensaje) ? ". " String(mensaje) : ""
-            this.Extra .= IsSet(extra) ? ". " String(extra) : ""
-            /* Comprobar siempre que el código de error es uno de los definidos, como en comprobarArgs de Debug.ahk */
-            this.Codigo := String(codigo)
-            this.Fecha := String(fecha)
-            if FormatTime(this.Fecha) == ""
-                throw Err_ValorArgError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") La fecha " this.Fecha " no está en formato YYYYMMDDHH24MISS", , , ERR_ERRORES["ERR_VALOR_ARG"], , "fecha", this.Fecha)
+            If IsSet(mensaje)
+                this.Message .= ". " mensaje
+            If IsSet(extra)
+                this.Extra .= ". " extra
+            this.Codigo := codigo ?? ERR_ERRORES_AHK[excepcion]
+            this.Fecha := fecha
 
             return excepcion
         }
+
 
         /*
             @method Constructor
@@ -250,10 +285,9 @@ if (!IsSet(__ERR_H__)) {
         */
         __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, errorAHK?) {
             super.__New(mensaje, what, extra)
-            this.DefinePropCadena("Codigo", true)
             this.Codigo := codigo
             this.Fecha := fecha
-            this.ExcepAHK := errorAHK
+            this.ErrorAHK := errorAHK
         }
 
         /*
