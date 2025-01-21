@@ -70,8 +70,8 @@ if (!IsSet(__ERR_H__)) {
     global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3)  ; Códigos establecidos en la documentación oficial
     global ERR_ERRORES_AHK := Map(MemoryError, ERR_ERRORES["ERR_MEMORIA"], OSError, ERR_ERRORES["ERR_OS"], TargetError, ERR_ERRORES["ERR_VENTANA"], TimeOutError, ERR_ERRORES["ERR_TIEMPO_RESPUESTA"], TypeError, ERR_ERRORES["ERR_TIPO"], UnsetError, ERR_ERRORES["ERR_INDEF"], MemberError, ERR_ERRORES["ERR_MIEMBRO_INDEF"], PropertyError, ERR_ERRORES["ERR_PROP_INDEF"], MethodError, ERR_ERRORES["ERR_METODO_INDEF"], UnsetItemError, ERR_ERRORES["ERR_CLAVE_INDEF"], ValueError, ERR_ERRORES["ERR_VALOR"], IndexError, ERR_ERRORES["ERR_INDICE"], ZeroDivisionError, ERR_ERRORES["ERR_DIV0"]) ; Código por defecto asociado a cada Error AHK
 
-    ; Flag para saber si solo se pueden lanzar errores predefinidos de AHK o cualquier tipo de error incluidos los personalizados. Se usa sobre todo para evitar lanzar errores del mismo tipo que se está creando. No se pasa este valor como argumento porque afecta también a get y set y no se puede pasar por argumento en estos casos.
-    _Err_SoloErroresAHK := false
+    ; Flag para saber si solo se pueden lanzar errores predefinidos de AHK o cualquier tipo de error incluidos los personalizados. Se usa sobre todo para evitar lanzar errores del mismo tipo que se está creando. No se pasa este valor como argumento porque afecta también a get y set y no se puede pasar por argumento en estos casos. SOLO DEBE SER USAR INTERNAMENTE POR MOTIVOS DE ESTABILIDAD.
+    global Err_SoloErroresAHK := false
 
 
 
@@ -229,7 +229,7 @@ if (!IsSet(__ERR_H__)) {
                 mensaje .= comprobarTipo.Mensaje
             catch 
                 mensaje .= "El tipo del valor no cumple " comprobarTipo.Name
-            throw !_Err_SoloErroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
+            throw !Err_SoloErroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
         }
         else if IsSet(validarValor) and !validarValor(valorArg) {
             mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") "
@@ -237,7 +237,7 @@ if (!IsSet(__ERR_H__)) {
                 mensaje .= validarValor.Mensaje
             catch   
                 mensaje .= "El valor no cumple la validación de " validarValor.Name
-            throw !_Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
         }
 
         return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
@@ -301,7 +301,7 @@ if (!IsSet(__ERR_H__)) {
     */
     class Err_Error extends Error {
         static __New() {
-            _Err_SoloErroresAHK := true
+            Err_SoloErroresAHK := true
 
             /* Se añaden las propiedades nuevas al prototipo de Err_Error */
 
@@ -318,17 +318,15 @@ if (!IsSet(__ERR_H__)) {
             this.Prototype.DefinePropEstandar("Fecha", Es_String, ValidarFecha, String)
 
             ComprobarError(e) => e is Error
-            ComprobarError.Mensaje := "La excepción tiene que ser tipo Error"
-            ExisteErrorAHK(e) => ERR_ERRORES_AHK.Has(e)
-            ExisteErrorAHK.Mensaje := "La excepción no es una de las predefinidas por AHK"
-            this.Prototype.DefinePropEstandar("ErrorAHK", ComprobarError, ExisteErrorAHK, String)
+            ComprobarError.Mensaje := "La excepción previa tiene que ser tipo Error"
+            this.Prototype.DefinePropEstandar("ErrorPrevio", ComprobarError)
 
             /* Hacer que toda la jerarquía de errores predefinidos cuelgue de Err_Error */
             
             for tipoErrorAHK in ERR_ERRORES_AHK
                 tipoErrorAHK.CambiarPadre(this, Error)
 
-            _Err_SoloErroresAHK := false
+            Err_SoloErroresAHK := false
         }
 
 
@@ -341,12 +339,13 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a concatenarse a la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
 
             @returns Excepción modificada.
 
             @event Vigilar posibles bucles al llamar a esta función. SIempre que la usemos nosotros hacerlo con una excepción que no vaya a lanzar errores por modificar sus campos.
         */
-        static ExtenderErr(excepcion, mensaje?, extra?, codigo?, fecha := A_Now) {
+        static ExtenderErr(excepcion, mensaje?, extra?, codigo?, fecha := A_Now, errorPrevio?) {
             ComprobarError(e) => e is Error
             ComprobarError.Mensaje := "La excepción tiene que ser tipo Error"
             ExisteErrorAHK(e) => ERR_ERRORES_AHK.Has(e)
@@ -359,6 +358,7 @@ if (!IsSet(__ERR_H__)) {
                 this.Extra .= ". " extra
             this.Codigo := codigo ?? ERR_ERRORES_AHK[excepcion]
             this.Fecha := fecha
+            this.ErrorPrevio := errorPrevio
 
             return excepcion
         }
@@ -368,22 +368,22 @@ if (!IsSet(__ERR_H__)) {
             @method Constructor
 
             @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
-            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} what - Info sobre
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
-            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la fecha no tiene el formato correcto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, errorAHK?) {
-            super.__New(mensaje, what, extra)
-            _Err_SoloErroresAHK := true
+        __New(mensaje, what := ERR_FUNCION_ORIGEN["ACTUAL"], extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, errorPrevio?) {
+            super.__New(mensaje, what, extra?)
+            Err_SoloErroresAHK := true
             this.Codigo := codigo
             this.Fecha := fecha
-            this.ErrorAHK := errorAHK
-            _Err_SoloErroresAHK := false
+            this.ErrorPrevio := errorPrevio
+            Err_SoloErroresAHK := false
         }
 
 

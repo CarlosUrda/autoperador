@@ -23,6 +23,7 @@
 
 */
 
+
 #Requires AutoHotkey v2.0
 
 /* En lugar del include se llamaría (dentro de Util??) a la función del módulo para ejecutarla, y solo se ejecutaría en teoría una vez si está en la librería */
@@ -60,27 +61,44 @@ Util() {
 
 
     /*
-        @function Util_EsAncestro
+        @function Util_EsAncestroPrv
 
-        @description Saber si un objeto clase es ancestro
+        @description Saber si un objeto clase es ancestro (se hereda de él). Esta función no verifica los argumentos, por lo que SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
+
+        @param {Class} objClase - Clase a partir de la cual comprobar si otra clase es ancestro.
+        @param {Class} ancestro - Clase a comprobar si es ancestro de clase.
+
+        @returns {Boolean} - Devuelve true o false si es ancestro o no.
     */
-    _Util_EsAncestroPrv(clase, ancestro) {
-        proto := clase.Prototype
-        while (proto := proto.Base) != ancestro.Prototype
-            if proto == Any.Prototype
+    _Util_EsAncestroPrv(objClase, ancestro) {
+        if objClase == ancestro or ancestro.Base == objClase
+            return false
+
+        while (objClase := objClase.Base) != ancestro
+            if objClase == Any
                 return false
 
         return true
     }
 
-    _Util_EsAncestroM(clase, ancestro) {
+    /*
+        @function Util_EsAncestro
+
+        @description Saber si un objeto clase es ancestro (se hereda de él).
+
+        @param {Class} objClase - Clase a partir de la cual comprobar si otra clase es ancestro.
+        @param {Class} ancestro - Clase a comprobar si es ancestro de clase.
+
+        @returns {Boolean} - Devuelve true o false si es ancestro o no.        
+    */
+    _Util_EsAncestroM(objClase, ancestro) {
         Err_VerificarArgPrv(ancestro, "ancestro", 1, Es_Clase(o) => o is Class)
-        return _Util_EsAncestroPrv(clase, ancestro)
+        return _Util_EsAncestroPrv(objClase, ancestro)
     }
 
-    _Util_EsAncestro(clase, ancestro) {
-        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)       
-        return clase.EsAncestro(ancestro)
+    _Util_EsAncestro(objClase, ancestro) {
+        Err_VerificarArgPrv(objClase, "clase", 1, Es_Clase(o) => o is Class)       
+        return objClase.EsAncestro(ancestro)
     }
 
     Class.Prototype.DefineProp("EsAncestro", {Call: _Util_EsAncestroM})
@@ -90,7 +108,7 @@ Util() {
     /*
         @function Util_EsDescendiente
 
-        @description Saber si un objeto clase es descendiente
+        @description Saber si un objeto clase es descendiente o heredero.
     */
     _Util_EsDescendienteM(clase, descendiente) {
         Err_VerificarArgPrv(descendiente, "descendiente", 1, Es_Clase(o) => o is Class)
@@ -111,7 +129,12 @@ Util() {
 
         No se puede poner como nuevo padre alguien que sea hijo de ancestro. Si ancestro es Object no se puede poner nada que no se Any como nuevoPadre
     */
-    _Util_CambiarPadreM(clase, nuevoPadre, ancestro?) {
+    _Util_CambiarPadreM(objClase, nuevoPadre, ancestro?) {
+        if objClase == nuevoPadre {
+            mensaje .= "El nuevo padre no puede ser igual que la clase objeto"
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 1, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+        }
+
         if IsSet(ancestro) {
             Err_VerificarArgPrv(ancestro, "antiguoPadre", 2, Es_Clase)
             protoAncestro := ancestro.Prototype
@@ -172,10 +195,10 @@ Util() {
     */
     _Util_Llamante() {
         try {
-            throw Error( , ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+            throw Error( , ERR_FUNCION_ORIGEN["LLAMANTE"])
         }
         catch Error as e {
-            if e.What == String(ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+            if e.What == String(ERR_FUNCION_ORIGEN["LLAMANTE"])
                 throw Err_Error.ExtenderErr(UnsetError("No existe función llamante")) 
             return e.What
         }
