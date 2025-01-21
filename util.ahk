@@ -38,31 +38,111 @@ Util() {
     ejecutado := true
 
     /*
-        @function Util_CambiarPadre        
-    */
-    _Util_CambiarPadreM(obj, nuevoPadre, antiguoPadre?, erroresAHK := false) {
+        @function Util_Clase
 
-        Util_VerificarArgPrv(nuevoPadre, "nuevoPadre", 1, Es_Object(o) => o is Object, , , erroresAHK)
-        Util_VerificarArgPrv(antiguoPadre, "antiguoPadre", 1, Es_Object, , , erroresAHK)
-       
-        if obj.Prototype.Base == nuevoPadre
-            return obj
-        
-        if obj.Prototype.Base == Error.Prototype
-            tipoErrorAHK.Prototype.Base := this.Prototype
+        @description Obtener el objeto Clase del tipo de un objeto. Es decir, el objeto Clase a partir de la cual, gracias a su prototipo, se creó la instancia del objeto.
+
+        @throws {TypeError} - Si el tipo del valor no es una clase, o es una clase cuyo prototipo no coincide con la base prototipo del valor. Es decir, que el valor no se creó a partir del prototipo de su tipo clase.
+
+        @returns {Class} - Objeto Clase tipo del objeto.
+    */
+    Util_Clase(valor) {
+        try 
+            clase := %Type(valor)%
+
+        if !IsSet(clase) or !(clase is Class)
+            throw Err_Error.ExtenderErr(TypeError("El tipo del valor no es una Clase"))
+        if clase.Prototype != valor.Base
+            throw Err_Error.ExtenderErr(TypeError("El prototipo de la clase tipo no coincide con la base prototipo del valor. Es decir, el objeto no se creó a partir del prototipo del tipo clase."))
+    }
+
+    Object.Prototype.DefineProp("Clase", {Call: Util_Clase})
+
+
+    /*
+        @function Util_EsAncestro
+
+        @description Saber si un objeto clase es ancestro
+    */
+    _Util_EsAncestroPrv(clase, ancestro) {
+        proto := clase.Prototype
+        while (proto := proto.Base) != ancestro.Prototype
+            if proto == Any.Prototype
+                return false
+
+        return true
+    }
+
+    _Util_EsAncestroM(clase, ancestro) {
+        Err_VerificarArgPrv(ancestro, "ancestro", 1, Es_Clase(o) => o is Class)
+        return _Util_EsAncestroPrv(clase, ancestro)
+    }
+
+    _Util_EsAncestro(clase, ancestro) {
+        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)       
+        return clase.EsAncestro(ancestro)
+    }
+
+    Class.Prototype.DefineProp("EsAncestro", {Call: _Util_EsAncestroM})
+    global Util_EsAncestro := _Util_EsAncestro
+
+
+    /*
+        @function Util_EsDescendiente
+
+        @description Saber si un objeto clase es descendiente
+    */
+    _Util_EsDescendienteM(clase, descendiente) {
+        Err_VerificarArgPrv(descendiente, "descendiente", 1, Es_Clase(o) => o is Class)
+        return _Util_EsAncestroPrv(descendiente, clase)
+    }
+
+    _Util_EsDescendiente(clase, descendiente) {
+        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)      
+        return clase.EsDescendiente(descendiente)
+    }
+
+    Class.Prototype.DefineProp("EsDescendiente", {Call: _Util_EsDescendienteM})
+    global Util_EsDescendiente := _Util_EsDescendiente
+
+    
+    /*
+        @function Util_CambiarPadre
+
+        No se puede poner como nuevo padre alguien que sea hijo de ancestro. Si ancestro es Object no se puede poner nada que no se Any como nuevoPadre
+    */
+    _Util_CambiarPadreM(clase, nuevoPadre, ancestro?) {
+        if IsSet(ancestro) {
+            Err_VerificarArgPrv(ancestro, "antiguoPadre", 2, Es_Clase)
+            protoAncestro := ancestro.Prototype
+        }
         else
-            protoripo := tipoErrorAHK.Prototype.Base            
+            protoAncestro := clase.Prototype.Base
+        EsAncestro(o) => !_Util_EsAncestroPrv(o, clase)
+        EsAncestro.Mensaje := "Nuevo padre no puede ser descendiente de clase"
+        Err_VerificarArgPrv(nuevoPadre, "nuevoPadre", 1, Es_Clase(o) => o is Class, EsAncestro(o) => !_Util_EsAncestroM(o, clase))
+        
+
+        Loop {
+            if (clase.Prototype.Base == nuevoPadre.Prototype)
+                return clase
+            clase := clase.Prototype.Base
+        } Until clase.Prototype.Base != protoAncestro
+        if clase.Prototype.Base == nuevoPadre.Prototype
+            return clas
+        
+        clase.Prototype.Base := nuevoPadre.Prototype
 
     }
     
-    _Util_CambiarPadre(obj, nuevoPadre, antiguoPadre?) {
-        Util_VerificarArgPrv(obj, "obj", 1, EsObject(o) => o is Object)
+    _Util_CambiarPadre(clase, nuevoPadre, antiguoPadre?) {
+        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)
         
-        return obj.CambiarPadre(nuevoPadre, antiguoPadre)
+        return clase.CambiarPadre(nuevoPadre, antiguoPadre)
     }
 
-    ; Se añade como método a Object
-    Object.Prototype.DefineProp("CambiarPadre", {Call: _Util_CambiarPadreM})
+    ; Se añade como método a Class
+    Class.Prototype.DefineProp("CambiarPadre", {Call: _Util_CambiarPadreM})
     global Util_CambiarPadre := _Util_CambiarPadre
 
 
@@ -105,76 +185,6 @@ Util() {
 
 
     /*
-        @function Util_VerificarArgPrv
-
-        @description Verificar un argumento para comprobar si es válido y cumple ciertas condiciones de tipo y valor. Solo comprueba el valor del argumento y no hace ninguna verificación del resto de parámetros, por lo que ESTA FUNCIÓN SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
-
-        @param {Object} valorArg - Valor del argumento a comprobar.
-        @param {String} nombreArg - Nombre del argumento.
-        @param {Integer} posArg - Posición del argumento.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación. NOTA: No se comprueba si lanza algún error.
-        @param {Boolean} erroresAHK - Si se desea que el método lance solo errores predefinidos.
-
-        @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
-
-        @throws {TypeError/Err_TipoArgError} - Si el valorArg no es de tipo correcto.        
-        @throws {ValueError/Err_ValorArgError} - Si el valorArg no ecumple la validación.
-    */
-    _Util_VerificarArgPrv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?, erroresAHK := false) {
-        if IsSet(comprobarTipo) and !comprobarTipo(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") "
-            try 
-                mensaje .= comprobarTipo.Mensaje
-            catch 
-                mensaje .= "El tipo del valor no cumple " comprobarTipo.Name
-            throw !erroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"], , erroresAHK)
-        }
-        else if IsSet(validarValor) and !validarValor(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") "
-            try 
-                mensaje .= validarValor.Mensaje
-            catch   
-                mensaje .= "El valor no cumple la validación de " validarValor.Name
-            throw !erroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"], , erroresAHK)
-        }
-
-        return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
-    }
-
-    global Util_VerificarArgPrv := _Util_VerificarArgPrv
-
-
-    /*
-        @function Util_VerificarArg
-
-    */
-    _Util_VerificarArg(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
-        if IsSet(nombreArg)
-            _Util_VerificarArgPrv(nombreArg, "nombreArg", 2, EsString(s) => Err_EsCadena(s), , String)
-        if IsSet(posArg)
-            _Util_VerificarArgPrv(posArg, "posArg", 3, IsInteger, Entero_mayor_que_1(v) => v >= 1, )
-        if IsSet(comprobarTipo) {
-            _Util_VerificarArgPrv(comprobarTipo, "comprobarTipo", 4, EsFuncion(f) => f is Func, , )
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
-        }
-        if IsSet(validarValor) {
-            _Util_VerificarArgPrv(validarValor, "validarValor", 5, EsFuncion, , )
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
-        }
-        if IsSet(convertirValor) {
-            _Util_VerificarArgPrv(convertirValor, "convertirValor", 6, EsFuncion, , )
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
-        }
-
-        return _Util_VerificarArgPrv(valorArg, nombreArg, posArg, comprobarTipo, validarValor, convertirValor)
-    }
-
-    global Util_VerificarArg := _Util_VerificarArg
-
-
-    /*
         @function Util_DefinePropEstandar
 
         @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad. Si no hereda la propiedad, la crea como una nueva usando una propiedad valor interna para guardar el valor. Si hereda la propiedad, respeta su comportamiento en el padre.
@@ -185,27 +195,26 @@ Util() {
         @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. NOTA: No se comprueba si lanza algún error.
         @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. NOTA: No se comprueba si lanza algún error.
         @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación. NOTA: No se comprueba si lanza algún error.
-        @param {Boolean} erroresAHK - Si se desea que el método lance solo errores predefinidos.
 
         @throws {TypeError/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
-    _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?, erroresAHK := false) {
+    _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
         if IsSet(prop)
-            _Util_VerificarArgPrv(prop, "prop", 1, Es_String(s) => Err_EsCadena(s), , String, erroresAHK)
+            Err_VerificarArgPrv(prop, "prop", 1, Es_String(s) => Err_EsCadena(s), , String)
         if IsSet(comprobarTipo) {
-            _Util_VerificarArgPrv(comprobarTipo, "comprobarTipo", 2, Es_Funcion(f) => f is Func, , , erroresAHK)
+            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 2, Es_Funcion(f) => f is Func)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
         if IsSet(validarValor) {
-            _Util_VerificarArgPrv(validarValor, "validarValor", 3, Es_Funcion, , , erroresAHK)
+            Err_VerificarArgPrv(validarValor, "validarValor", 3, Es_Funcion)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
         }
         if IsSet(convertirValor) {
-            _Util_VerificarArgPrv(convertirValor, "convertirValor", 4, Es_Funcion, , , erroresAHK)
+            Err_VerificarArgPrv(convertirValor, "convertirValor", 4, Es_Funcion)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
@@ -221,7 +230,7 @@ Util() {
         }
 
         _Set(_obj, valor) {
-            valorVerficado := _Util_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor, erroresAHK)
+            valorVerficado := Err_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor)
 
             if !_obj.Base.Base.HasProp(prop)
                 return (_obj.%"_" prop% := valorVerficado)
@@ -246,7 +255,7 @@ Util() {
     Object.Prototype.DefineProp("DefinePropEstandar", {Call: _Util_DefinePropEstandarM})
     global Util_DefinePropEstandar := _Util_DefinePropEstandar
 
-    
+        
     /*
         @function Util_AmpliarArgs
 
