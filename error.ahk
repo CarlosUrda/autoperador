@@ -229,7 +229,7 @@ if (!IsSet(__ERR_H__)) {
                 mensaje .= comprobarTipo.Mensaje
             catch 
                 mensaje .= "El tipo del valor no cumple " comprobarTipo.Name
-            throw !Err_SoloErroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg, posArg, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
+            throw !Err_SoloErroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg?, posArg?, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
         }
         else if IsSet(validarValor) and !validarValor(valorArg) {
             mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") "
@@ -237,7 +237,7 @@ if (!IsSet(__ERR_H__)) {
                 mensaje .= validarValor.Mensaje
             catch   
                 mensaje .= "El valor no cumple la validación de " validarValor.Name
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg, posArg, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg?, posArg?, valorArg?) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
         }
 
         return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
@@ -284,7 +284,7 @@ if (!IsSet(__ERR_H__)) {
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
 
-        return _Err_VerificarArgPrv(valorArg, nombreArg, posArg, comprobarTipo, validarValor, convertirValor)
+        return _Err_VerificarArgPrv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?)
     }
 
     global Err_VerificarArg := _Err_VerificarArg
@@ -358,7 +358,8 @@ if (!IsSet(__ERR_H__)) {
                 this.Extra .= ". " extra
             this.Codigo := codigo ?? ERR_ERRORES_AHK[excepcion]
             this.Fecha := fecha
-            this.ErrorPrevio := errorPrevio
+            if IsSet(errorPrevio)
+                this.ErrorPrevio := errorPrevio
 
             return excepcion
         }
@@ -368,7 +369,7 @@ if (!IsSet(__ERR_H__)) {
             @method Constructor
 
             @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
-            @param {String} what - Info sobre
+            @param {String} what - Info sobre la función desde donde se llamó la excepción: -1 función actual que la lanzó, -2 padre llamante de la función actual, -3 padre del padre, etc. Por defecto toma la función que llamó al constructor de Error, siendo distinto de -1 que obtiene la función que lanzó la excepción. Por eso aquí se toma por defecto -1 en lugar de dejarlo indefinido, para que la función sea la que lanzó este error personalizado y no el __New que llama al super.__New().
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
@@ -382,7 +383,8 @@ if (!IsSet(__ERR_H__)) {
             Err_SoloErroresAHK := true
             this.Codigo := codigo
             this.Fecha := fecha
-            this.ErrorPrevio := errorPrevio
+            if IsSet(errorPrevio)
+                this.ErrorPrevio := errorPrevio
             Err_SoloErroresAHK := false
         }
 

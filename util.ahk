@@ -92,7 +92,7 @@ Util() {
         @returns {Boolean} - Devuelve true o false si es ancestro o no.        
     */
     _Util_EsAncestroM(objClase, ancestro) {
-        Err_VerificarArgPrv(ancestro, "ancestro", 1, Es_Clase(o) => o is Class)
+        Err_VerificarArgPrv(ancestro, "ancestro", 2, Es_Clase(o) => o is Class)
         return _Util_EsAncestroPrv(objClase, ancestro)
     }
 
@@ -111,7 +111,7 @@ Util() {
         @description Saber si un objeto clase es descendiente o heredero.
     */
     _Util_EsDescendienteM(clase, descendiente) {
-        Err_VerificarArgPrv(descendiente, "descendiente", 1, Es_Clase(o) => o is Class)
+        Err_VerificarArgPrv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
         return _Util_EsAncestroPrv(descendiente, clase)
     }
 
@@ -129,33 +129,47 @@ Util() {
 
         No se puede poner como nuevo padre alguien que sea hijo de ancestro. Si ancestro es Object no se puede poner nada que no se Any como nuevoPadre
     */
-    _Util_CambiarPadreM(objClase, nuevoPadre, ancestro?) {
-        if objClase == nuevoPadre {
-            mensaje .= "El nuevo padre no puede ser igual que la clase objeto"
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 1, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+    _Util_CambiarPadreM(objClase, nuevoPadre, ancestro := objClase.Base) {
+        if objClase == Object or objClase == Any {
+            mensaje := "Ni Object ni Any pueden cambiar de padre"
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "this", 1, objClase) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
         }
 
-        if IsSet(ancestro) {
-            Err_VerificarArgPrv(ancestro, "antiguoPadre", 2, Es_Clase)
-            protoAncestro := ancestro.Prototype
+        if objClase == nuevoPadre
+            mensaje := "El nuevo padre no puede ser la clase objeto"
+        if objClase.EsDescendiente(nuevoPadre)
+            mensaje := "El nuevo padre no puede descendiente de la clase objeto"
+
+        if IsSet(mensaje)
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 2, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+
+        if nuevoPadre == ancestro
+            return objClase
+        
+        if ancestro == Any {
+            mensaje := "El ancestro no puede ser Any y un nuevo padre por debajo distinto de Any"
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "ancestro", 3, ancestro) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
         }
-        else
-            protoAncestro := clase.Prototype.Base
-        EsAncestro(o) => !_Util_EsAncestroPrv(o, clase)
-        EsAncestro.Mensaje := "Nuevo padre no puede ser descendiente de clase"
-        Err_VerificarArgPrv(nuevoPadre, "nuevoPadre", 1, Es_Clase(o) => o is Class, EsAncestro(o) => !_Util_EsAncestroM(o, clase))
         
+        if ancestro != objClase.Base
+            Err_VerificarArgPrv(ancestro, "ancestro", 3, Es_Clase(o) => o is Class)
 
-        Loop {
-            if (clase.Prototype.Base == nuevoPadre.Prototype)
-                return clase
-            clase := clase.Prototype.Base
-        } Until clase.Prototype.Base != protoAncestro
-        if clase.Prototype.Base == nuevoPadre.Prototype
-            return clas
-        
-        clase.Prototype.Base := nuevoPadre.Prototype
+        while objClase.Base != ancestro {
+            if objClase.Base == nuevoPadre
+                mensaje := "El nuevo padre no puede ser descendiente de ancestro"
+            if objClase.Base == Object {
+                mensaje := "El ancestro no es ascendente de this"
+                throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "ancestro", 3, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            }
+            objClase := objClase.Base
+        }
 
+        if IsSet(mensaje)
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 2, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+
+        objClase.Base := nuevoPadre
+
+        return objClase
     }
     
     _Util_CambiarPadre(clase, nuevoPadre, antiguoPadre?) {
@@ -187,7 +201,7 @@ Util() {
     /*
         @function Util_Llamante
 
-        @description Obtener el nombre de la función llamante de la actual que llama a esta propia función.
+        @description Obtener el nombre de la función llamante de la actual que, a su vez, está llamando a Util_llamante.
 
         @throws {UnsetError} - Si no existe función llamante, como en el caso de invocar esta función desde un ámbito global de script.
 
@@ -195,10 +209,10 @@ Util() {
     */
     _Util_Llamante() {
         try {
-            throw Error( , ERR_FUNCION_ORIGEN["LLAMANTE"])
+            throw Error( , ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
         }
         catch Error as e {
-            if e.What == String(ERR_FUNCION_ORIGEN["LLAMANTE"])
+            if e.What == String(ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
                 throw Err_Error.ExtenderErr(UnsetError("No existe función llamante")) 
             return e.What
         }
