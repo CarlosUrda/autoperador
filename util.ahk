@@ -61,48 +61,48 @@ Util() {
 
 
     /*
-        @function Util_EsAncestroPrv
+        @function Util_EsBasePrv
 
         @description Saber si un objeto clase es ancestro (se hereda de él). Esta función no verifica los argumentos, por lo que SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
 
-        @param {Class} objClase - Clase a partir de la cual comprobar si otra clase es ancestro.
+        @param {Class} clase - Clase a partir de la cual comprobar si otra clase es ancestro.
         @param {Class} ancestro - Clase a comprobar si es ancestro de clase.
 
         @returns {Boolean} - Devuelve true o false si es ancestro o no.
     */
-    _Util_EsAncestroPrv(objClase, ancestro) {
-        if objClase == ancestro or ancestro.Base == objClase
+    _Util_EsBasePrv(clase, baseRaiz) {
+        if clase == baseRaiz or baseRaiz.Base == clase
             return false
 
-        while (objClase := objClase.Base) != ancestro
-            if objClase == Any
+        while (clase := clase.Base) != baseRaiz
+            if clase == Any
                 return false
 
         return true
     }
 
     /*
-        @function Util_EsAncestro
+        @function Util_EsBase
 
         @description Saber si un objeto clase es ancestro (se hereda de él).
 
-        @param {Class} objClase - Clase a partir de la cual comprobar si otra clase es ancestro.
-        @param {Class} ancestro - Clase a comprobar si es ancestro de clase.
+        @param {Class} clase - Clase a partir de la cual comprobar si otra clase es ancestro.
+        @param {Class} baseRaiz - Clase a comprobar si es ancestro de clase.
 
         @returns {Boolean} - Devuelve true o false si es ancestro o no.        
     */
-    _Util_EsAncestroM(objClase, ancestro) {
-        Err_VerificarArgPrv(ancestro, "ancestro", 2, Es_Clase(o) => o is Class)
-        return _Util_EsAncestroPrv(objClase, ancestro)
+    _Util_EsBaseM(clase, baseRaiz) {
+        Err_VerificarArgPrv(baseRaiz, "baseRaiz", 2, Es_Clase(o) => o is Class)
+        return _Util_EsBasePrv(clase, baseRaiz)
     }
 
-    _Util_EsAncestro(objClase, ancestro) {
-        Err_VerificarArgPrv(objClase, "clase", 1, Es_Clase(o) => o is Class)       
-        return objClase.EsAncestro(ancestro)
+    _Util_EsBase(clase, baseRaiz) {
+        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)
+        return clase.EsAncestro(baseRaiz)
     }
 
-    Class.Prototype.DefineProp("EsAncestro", {Call: _Util_EsAncestroM})
-    global Util_EsAncestro := _Util_EsAncestro
+    Class.Prototype.DefineProp("EsBase", {Call: _Util_EsBaseM})
+    global Util_EsBase := _Util_EsBase
 
 
     /*
@@ -112,7 +112,7 @@ Util() {
     */
     _Util_EsDescendienteM(clase, descendiente) {
         Err_VerificarArgPrv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
-        return _Util_EsAncestroPrv(descendiente, clase)
+        return _Util_EsBasePrv(descendiente, clase)
     }
 
     _Util_EsDescendiente(clase, descendiente) {
@@ -125,62 +125,68 @@ Util() {
 
     
     /*
-        @function Util_CambiarPadre
+        @function Util_CambiarBase
 
-        No se puede poner como nuevo padre alguien que sea hijo de ancestro. Si ancestro es Object no se puede poner nada que no se Any como nuevoPadre
+        @description Modificar la herencia de una clase. Toda la jerarquía desde la clase hasta un ancestro o base raíz se convierte en heredera hija de una nueva base clase padre, dejando de heredar de base raíz. La nueva base se convierte en la clase de la cual hereda toda la jerarquía que existía por debajo del ancestro base raíz.
+
+        @param {Class} clase - Clase a partir de la cual se va a obtener la clase inmediatamente inferior a su base raíz, siendo ésta la que cambiará su padre por la nueva base. Si la base raíz es la base inmediata (padre) de la clase, se cambia directamente la base de clase.
+        @param {Clase} baseNueva - Clase que será la nueva Base.
+        @param {Clase} baseRaiz - Base ancestro de la clase a partir de la cual toda su herencia tendrá como nueva base baseNueva.
+
+        @returns {Clase} La clase con la nueva jerarquía cambiada
+
+        @throws {ValueError/Err_ValorArgError} - Si alguno de los valores de los argumentos no cumple la condición para poder realizar el cambio.
+        @throws {TypeError/Err_TipoArgError} - Si la baseNueva o baseRaíz no son de tiop Class.
+
+        @todo Hacerlo genérico para cualquier árbol cuyo nodo pueda acceder al padre.
+        Si se supiese el hijo de una clase, se podría hacer esta función simplemente pasando la baseRaiz y la baseNueva, de manera que se acedería al hijo de la baseRaiz y se cambiaría su base por la nueva. Si se quisiese cambiar la base directa de una clase, simplemente se pasaría como base raíz su base actual.
     */
-    _Util_CambiarPadreM(objClase, nuevoPadre, ancestro := objClase.Base) {
-        if objClase == Object or objClase == Any {
-            mensaje := "Ni Object ni Any pueden cambiar de padre"
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "this", 1, objClase) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+    _Util_CambiarBaseM(clase, baseNueva, baseRaiz := clase.Base) {
+        switch {
+            case clase == Object or clase == Any:
+                infoError := {mensaje: "Ni Object ni Any pueden cambiar de base", nombreArg: "clase", valorArg: clase, numArg: 1}
+            case baseNueva == clase:
+                infoError := {mensaje: "La baseNueva no puede ser la misma que clase", arg: baseNueva, numArg: 2}
+            case baseRaiz == clase:
+                infoError := {mensaje: "La baseRaiz no puede ser la misma que clase", arg: baseRaiz, numArg: 3}
+            case baseRaiz == Any:
+                infoError := {mensaje: "La baseRaiz no puede ser Any", arg: baseRaiz, numArg: 3}
+            case clase.EsDescendiente(baseNueva): ; Se comprueba además si baseNueva es Class
+                infoError := {mensaje: "La baseNueva no puede ser descendiente de la clase", arg: baseNueva, numArg: 2}
+        }
+        if IsSet(infoError)
+            throw !Err_SoloErroresAHK ? Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg) : Err_Error.ExtenderErr(ValueError(infoError.mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+
+        if baseNueva == baseRaiz
+            return clase
+
+        if baseRaiz != clase.Base {
+            Err_VerificarArgPrv(baseRaiz, "baseRaiz", 3, Es_Clase(o) => o is Class)
+
+            Loop { ; Loop en lugar de while para aprovechar la comparación anterior necesaria.
+                if clase.Base == baseNueva
+                    infoError := {mensaje: "La baseNueva no puede ser ascendente de la clase y no ascendente de baseRaiz", arg: baseNueva, numArg: 2}
+                else if clase.Base == Object
+                    infoError := {mensaje: "La baseRaiz no es ascendente de la clase", arg: baseRaiz, numArg: 3}
+                if IsSet(infoError)
+                    throw !Err_SoloErroresAHK ? Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg) : Err_Error.ExtenderErr(ValueError(infoError.mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            } Until (clase := clase.Base).Base != baseRaiz
         }
 
-        if objClase == nuevoPadre
-            mensaje := "El nuevo padre no puede ser la clase objeto"
-        if objClase.EsDescendiente(nuevoPadre)
-            mensaje := "El nuevo padre no puede descendiente de la clase objeto"
+        clase.Base := baseNueva
 
-        if IsSet(mensaje)
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 2, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-
-        if nuevoPadre == ancestro
-            return objClase
-        
-        if ancestro == Any {
-            mensaje := "El ancestro no puede ser Any y un nuevo padre por debajo distinto de Any"
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "ancestro", 3, ancestro) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-        }
-        
-        if ancestro != objClase.Base
-            Err_VerificarArgPrv(ancestro, "ancestro", 3, Es_Clase(o) => o is Class)
-
-        while objClase.Base != ancestro {
-            if objClase.Base == nuevoPadre
-                mensaje := "El nuevo padre no puede ser descendiente de ancestro"
-            if objClase.Base == Object {
-                mensaje := "El ancestro no es ascendente de this"
-                throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "ancestro", 3, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-            }
-            objClase := objClase.Base
-        }
-
-        if IsSet(mensaje)
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , "nuevoPadre", 2, nuevoPadre) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-
-        objClase.Base := nuevoPadre
-
-        return objClase
+        return clase
     }
     
-    _Util_CambiarPadre(clase, nuevoPadre, antiguoPadre?) {
+    _Util_CambiarBase(clase, baseNueva, baseRaiz?) {
         Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)
         
-        return clase.CambiarPadre(nuevoPadre, antiguoPadre)
+        return clase.CambiarBase(baseNueva, baseRaiz?)
     }
 
     ; Se añade como método a Class
-    Class.Prototype.DefineProp("CambiarPadre", {Call: _Util_CambiarPadreM})
-    global Util_CambiarPadre := _Util_CambiarPadre
+    Class.Prototype.DefineProp("CambiarBase", {Call: _Util_CambiarBaseM})
+    global Util_CambiarBase := _Util_CambiarBase
 
 
     /*
