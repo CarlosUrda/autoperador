@@ -213,34 +213,42 @@ if (!IsSet(__ERR_H__)) {
         @param {Object} valorArg - Valor del argumento a comprobar.
         @param {String} nombreArg - Nombre del argumento.
         @param {Integer} posArg - Posición del argumento.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. NOTA: No se comprueba si lanza algún error.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación. NOTA: No se comprueba si lanza algún error.
+        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. Si lanza algún error se considera igual que si valorArg no cumpliese el tipo correcto, y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
+        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. Si lanza algún error se considera igual que si valorArg no cumple el valor correcto y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
+        @param {Func} convertirValor - Función que devolverá el valor convertido. Si lanza algún error se considera un error de    y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
 
         @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
 
         @throws {TypeError/Err_TipoArgError} - Si el valorArg no es de tipo correcto.        
-        @throws {ValueError/Err_ValorArgError} - Si el valorArg no ecumple la validación.
+        @throws {ValueError/Err_ValorArgError} - Si el valorArg no ecumple la validación del valor..
+        @throws {ValueError/Err_ValorArgError} - Si el valorArg no ecumple la validación del valor..
     */
     _Err_VerificarArgPrv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
-        if IsSet(comprobarTipo) and !comprobarTipo(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_TIPO_ARG"] ") "
-            try 
-                mensaje .= comprobarTipo.Mensaje
-            catch 
-                mensaje .= "El tipo del valor no cumple " comprobarTipo.Name
-            throw !Err_SoloErroresAHK ? Err_TipoArgError(mensaje, , , , , , nombreArg?, posArg?, Type(valorArg)) : Err_Error.ExtenderErr(TypeError(mensaje), , , ERR_ERRORES["ERR_TIPO_ARG"])
-        }
-        else if IsSet(validarValor) and !validarValor(valorArg) {
-            mensaje := "(" ERR_ERRORES["ERR_VALOR_ARG"] ") "
-            try 
-                mensaje .= validarValor.Mensaje
-            catch   
-                mensaje .= "El valor no cumple la validación de " validarValor.Name
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(mensaje, , , , , , nombreArg?, posArg?, valorArg?) : Err_Error.ExtenderErr(ValueError(mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+        infoFunciones := Map()
+        if IsSet(comprobarTipo)
+            infoFunciones[comprobarTipo] := {codigoErr: ERR_ERRORES["ERR_TIPO_ARG"], mensaje: "El tipo del valor no cumple", tipoError: Err_TipoArgError, tipoErrorAHK: TypeError, argError: Type(valorArg)}
+        if IsSet(comprobarTipo)
+            infoFunciones[validarValor] := {codigoErr: ERR_ERRORES["ERR_VALOR_ARG"], mensaje: "El valor no cumple la validación de", tipoError: Err_ValorArgError, tipoErrorAHK: ValueError, argError: valorArg}
+
+        for funcion, info in infoFunciones {
+            try
+                esCorrecto := funcion(valorArg) 
+            catch as e
+                esCorrecto := false
+         
+            if !esCorrecto {
+                mensaje := "(" info.codigoErr ") " (funcion.HasProp("Mensaje") and Err_EsCadena(funcion.Mensaje) ? funcion.mensaje : info.mensaje " " funcion.Name)
+
+                throw !Err_SoloErroresAHK ? info.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, info.argError) : Err_Error.ExtenderErr(info.tipoErrorAHK(mensaje), , , info.codigoErr, , e?)
+            }
         }
 
-        return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
+        try
+            return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
+        catch as e {
+            mensaje := "El valor no se puede convertir"
+            throw !Err_SoloErroresAHK ? Err_ArgError(mensaje, , , , , e?, nombreArg?, posArg?, valorArg) : Err_Error.ExtenderErr(ValueError(mensaje), , , info.codigoErr, , e?)
+        }
     }
 
     global Err_VerificarArgPrv := _Err_VerificarArgPrv
@@ -269,7 +277,9 @@ if (!IsSet(__ERR_H__)) {
         if IsSet(posArg)
             _Err_VerificarArgPrv(posArg, "posArg", 3, IsInteger, Entero_mayor_que_1(v) => v >= 1)
         if IsSet(comprobarTipo) {
-            _Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 4, EsFuncion(f) => f is Func)
+            EsFuncion(f) => f is Func and f.AdmiteNumArgs(1)
+            EsFuncion.Mensaje := "No es una función o no admite un argumento"
+            _Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 4, EsFuncion)
 
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
@@ -417,14 +427,14 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
-            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ARG"], fecha?, errorAHK?, nombreArg?, posArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?) {
             if !IsSet(posArg)
                 posArg := ""
             else if !IsInteger(posArg) 
@@ -459,7 +469,7 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
-            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
             @param {String} tipoArg - Nombre del tipo de argumento que ha generado el error. Si son varios posibles tipos de varios argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad TipoArg
@@ -467,7 +477,7 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_TIPO_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, tipoArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_TIPO_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, tipoArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
             super._NuevasPropsCadena(Map("tipoArg", tipoArg ?? ""), !IsSet(extra))
         }
@@ -494,7 +504,7 @@ if (!IsSet(__ERR_H__)) {
             @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
             @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
             @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
-            @param {Error} errorAHK - Error predefinido de ahk que lanzó el sistema como causa del problema.
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
             @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida; si está definido se la guarda el valor. Se puede pasar una lista de valores en caso de haber varios, aunque internamente no considera si son varios o un solo valor lista. Simplemente.
@@ -502,7 +512,7 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_VALOR_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, valorArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_VALOR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
 
             if IsSet(valorArg) {
@@ -555,8 +565,11 @@ if (!IsSet(__ERR_H__)) {
             @method Constructor
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
+
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
+
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION"], fecha?, errorAHK?, funcion?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION"], fecha?, errorPrevio?, funcion?) {
             super.__New(mensaje, what, extra, codigo, fecha)
             super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
         }
@@ -578,10 +591,12 @@ if (!IsSet(__ERR_H__)) {
         /*
             @method Constructor
 
+            @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
+
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si el número de argumentos no es un entero >= 0
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_NUM_ARGS"], fecha?, errorAHK?, funcion?, numArgs?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_NUM_ARGS"], fecha?, errorPrevio?, funcion?, numArgs?) {
             if !IsSet(numArgs)
                 numArgs := ""
             else if !IsInteger(numArgs) 

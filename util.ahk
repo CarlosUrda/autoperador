@@ -144,7 +144,7 @@ Util() {
     _Util_CambiarBaseM(clase, baseNueva, baseRaiz := clase.Base) {
         switch {
             case clase == Object or clase == Any:
-                infoError := {mensaje: "Ni Object ni Any pueden cambiar de base", nombreArg: "clase", valorArg: clase, numArg: 1}
+                infoError := {mensaje: "Ni Object ni Any pueden cambiar de base", nombreArg: "this", valorArg: clase, numArg: 1}
             case baseNueva == clase:
                 infoError := {mensaje: "La baseNueva no puede ser la misma que clase", arg: baseNueva, numArg: 2}
             case baseRaiz == clase:
@@ -231,8 +231,9 @@ Util() {
         @function Util_DefinePropEstandar
 
         @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad. Si no hereda la propiedad, la crea como una nueva usando una propiedad valor interna para guardar el valor. Si hereda la propiedad, respeta su comportamiento en el padre.
-        - Get lanzará PropertyError si el valor interno no ha sido definido y la propiedad get no es heredada. Si hereda set pero no get, respetará el comportamiento heredado no pudiendo devolver el valor, solo guardarlo.
-        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no hereda la propiedad lo guarda en una propiedad valor interna. Si hereda set lo guarda usaándolo. Si hereda get y no set lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación.
+        - Get lanzará PropertyError si no hereda la propiedad y el valor interno no ha sido definido; o si hereda set pero no get, respetando el comportamiento heredado.
+        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si hereda set lo usa; si no hereda set lo guarda en una propiedad valor interna excepto si hereda también get, en cuyo caso lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación.
+        En caso de heredar la propiedad con Call y no con Get, se considera como si fuese Get al usarlo sin llamada () [no hay manera de diferenciar ambas porque get puede devolver como valor una función]: devuelve como valor la función Call y no se puede grabar. Si hereda Get y Call, Get tiene prioridad sobre Call al usar la propiedad sin llamada ().
 
         @param {String} prop - Nombre de la propiedad.
         @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. NOTA: No se comprueba si lanza algún error.
@@ -245,19 +246,21 @@ Util() {
     */
     _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
         if IsSet(prop)
-            Err_VerificarArgPrv(prop, "prop", 1, Es_String(s) => Err_EsCadena(s), , String)
+            Err_VerificarArgPrv(prop, "prop", 2, Es_String(s) => Err_EsCadena(s), , String)
         if IsSet(comprobarTipo) {
-            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 2, Es_Funcion(f) => f is Func)
+            EsFuncion(f) => f is Func and f.AdmiteNumArgs(1)
+            EsFuncion.Mensaje := "No es una función o no admite un argumento"
+            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 3, EsFuncion)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
         if IsSet(validarValor) {
-            Err_VerificarArgPrv(validarValor, "validarValor", 3, Es_Funcion)
+            Err_VerificarArgPrv(validarValor, "validarValor", 4, EsFuncion)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
         }
         if IsSet(convertirValor) {
-            Err_VerificarArgPrv(convertirValor, "convertirValor", 4, Es_Funcion)
+            Err_VerificarArgPrv(convertirValor, "convertirValor", 5, EsFuncion)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
@@ -268,20 +271,21 @@ Util() {
 
             try
                 return _obj.Base.%prop%
-            catch
-                throw Err_Error.ExtenderErr(PropertyError("La propiedad " prop " no tiene aún ningún valor definido"))
+
+            mensaje := "La propiedad " prop " no tiene " (!_obj.Base.HasProp(prop) ? "aún ningún valor definido" : "ningún método get")
+            throw Err_Error.ExtenderErr(PropertyError(mensaje))
         }
 
         _Set(_obj, valor) {
-            valorVerficado := Err_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor)
+            valorVerficado := Err_VerificarArgPrv(valor, "value", 2, comprobarTipo, validarValor, convertirValor)
+
+            try
+                return (_obj.Base.%prop% := valorVerficado)
 
             if !_obj.Base.HasProp(prop)
                 return (_obj.%"_" prop% := valorVerficado)
             
-            try
-                return (_obj.Base.%prop% := valorVerficado)
-            catch
-                throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor en la propiedad " prop))
+            throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor (no hay set) en la propiedad " prop))
         }
 
         return obj.DefineProp(prop, {Get: _Get, Set: _Set})
@@ -635,6 +639,8 @@ Util() {
         @class Util_MapOrdenado
 
         @description 
+
+        @todo Si el diccionario no tiene función para comparar las claves, éstas deben estar ordenadas en el orden en que se van metiendo.
 
     */
     class Util_MapOrden extends Map {
