@@ -127,13 +127,13 @@ Util() {
     /*
         @function Util_CambiarBase
 
-        @description Modificar la herencia de una clase. Toda la jerarquía desde la clase hasta un ancestro o base raíz se convierte en heredera hija de una nueva base clase padre, dejando de heredar de base raíz. La nueva base se convierte en la clase de la cual hereda toda la jerarquía que existía por debajo del ancestro base raíz.
+        @description Modificar la herencia de una clase. Toda la jerarquía desde la clase hasta un ancestro o base raíz (no incluido) se convierte en heredera de una nueva base clase, dejando de heredar de base raíz. La nueva base se convierte en la clase a partir de la cual hereda toda la jerarquía que existía por debajo del ancestro base raíz.
 
         @param {Class} clase - Clase a partir de la cual se va a obtener la clase inmediatamente inferior a su base raíz, siendo ésta la que cambiará su padre por la nueva base. Si la base raíz es la base inmediata (padre) de la clase, se cambia directamente la base de clase.
         @param {Clase} baseNueva - Clase que será la nueva Base.
         @param {Clase} baseRaiz - Base ancestro de la clase a partir de la cual toda su herencia tendrá como nueva base baseNueva.
 
-        @returns {Clase} La clase con la nueva jerarquía cambiada
+        @returns {Clase} La clase de la jerarquía que ha cambiado su Base.
 
         @throws {ValueError/Err_ValorArgError} - Si alguno de los valores de los argumentos no cumple la condición para poder realizar el cambio.
         @throws {TypeError/Err_TipoArgError} - Si la baseNueva o baseRaíz no son de tiop Class.
@@ -170,7 +170,7 @@ Util() {
                     infoError := {mensaje: "La baseRaiz no es ascendente de la clase", arg: baseRaiz, numArg: 3}
                 if IsSet(infoError)
                     throw !Err_SoloErroresAHK ? Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg) : Err_Error.ExtenderErr(ValueError(infoError.mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
-            } Until (clase := clase.Base).Base != baseRaiz
+            } Until (clase := clase.Base).Base == baseRaiz
         }
 
         clase.Base := baseNueva
@@ -267,7 +267,7 @@ Util() {
                 return _obj.%"_" prop%
 
             try
-                return _obj.Base.Base.%prop%
+                return _obj.Base.%prop%
             catch
                 throw Err_Error.ExtenderErr(PropertyError("La propiedad " prop " no tiene aún ningún valor definido"))
         }
@@ -275,11 +275,11 @@ Util() {
         _Set(_obj, valor) {
             valorVerficado := Err_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor)
 
-            if !_obj.Base.Base.HasProp(prop)
+            if !_obj.Base.HasProp(prop)
                 return (_obj.%"_" prop% := valorVerficado)
             
             try
-                return (_obj.Base.Base.%prop% := valorVerficado)
+                return (_obj.Base.%prop% := valorVerficado)
             catch
                 throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor en la propiedad " prop))
         }
