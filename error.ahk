@@ -243,6 +243,7 @@ if (!IsSet(__ERR_H__)) {
         @throws {ValueError/Err_ValorArgError} - Si algún argumento no ecumple la validación de valor.
     */
     _Err_VerificarArg(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
+        ; nombreArg y posArg ya se comprueban en el constructor del Error a lanzar.
         if IsSet(nombreArg)
             _Err_VerificarArgPrv(nombreArg, "nombreArg", 2, EsString(s) => Err_EsCadena(s), , String)
         if IsSet(posArg)
@@ -395,11 +396,10 @@ if (!IsSet(__ERR_H__)) {
         }
         
         /*
-            @static CrearError
+            @static CrearErrorAHK
 
-            @description Crear un objeto de uno de los tipos de error predefinidos AHK heredados de Err_ErrorAHK extendiendo su información completando las propiedades que faltan.
+            @description Crear un objeto error de tipo error predefinido AHK heredero de Err_ErrorAHK, extendiendo su información completando las propiedades que faltan. Solo se puede usar desde las clases heredadas de CrearError
 
-            @param {Class: Subclass<Err_ErrorAHK>} tipoError - Tipo de error que hereda de Err_ErrorAHK: tipos de errores predefinidos por AHK (excepto Error).
             @param {String} mensaje - Mensaje del error.
             @param {String} what - Información de la propiedad what. Por defecto la función que llamó a CrearError.
             @param {String} extra - Información tomada como propiedad extra.
@@ -409,14 +409,15 @@ if (!IsSet(__ERR_H__)) {
 
             @returns {Subclass<Err_ErrorAHK>} Excepción creada.
         */
-        static CrearError(tipoError, mensaje?, what := ERR_FUNCION_ORIGEN["LLAMANTE"], extra?, codigo?, fecha := A_Now, errorPrevio?) {
+        static CrearErrorAHK(mensaje?, what := ERR_FUNCION_ORIGEN["LLAMANTE"], extra?, codigo?, fecha := A_Now, errorPrevio?) {
             Err_ErroresPersonalizadosActivos := false
 
-            ComprobarTipo(e) => e.HasBase(Err_ErrorAHK)
-            ComprobarTipo.Mensaje := "El tipo de error AHK tiene que heredar de Err_ErrorAHK (Errores predefinidos que heredaban de Error)"
-            tipoError := Err_VerificarArgPrv(tipoError, "tipoError", 1, ComprobarTipo)
+            ComprobarTipo(e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK)
+            ComprobarTipo.Mensaje := "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"
+            tipoError := Err_VerificarArgPrv(this, "this", 1, ComprobarTipo)
+            ; *** Decidir si en los métodos, this es el argumento 0 o 1. Y decidir si VerificarArg comprueba los argumentos nombreArg y posArg que luego se vuelven a comprobar si se lanza el error.
 
-            excepcion := tipoError(mensaje?, what, extra?)
+            excepcion := this(mensaje?, what, extra?)
             excepcion.Codigo := codigo ?? this._ERRORES_AHK[tipoError]
             excepcion.Fecha := fecha
             if IsSet(errorPrevio)
@@ -448,7 +449,7 @@ if (!IsSet(__ERR_H__)) {
 
             ValidarPos(i) => Integer(i) >= 1
             ValidarPos.Mensaje := "La posición del argumento debe ser entero >= 1"
-            this.Prototype.DefinePropEstandar("Codigo", Es_Entero(i) => IsInteger(i), ValidarPos, Integer)
+            this.Prototype.DefinePropEstandar("PosArg", Es_Entero(i) => IsInteger(i), ValidarPos, Integer)
             this.Prototype.DefinePropEstandar("NombreArg", Es_String(s) => Err_EsCadena(s), , String)
 
             Err_ErroresPersonalizadosActivos := true

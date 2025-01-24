@@ -532,6 +532,8 @@ Util() {
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
     _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
+        _Err_VerificarArgPrv(sepGrupo, "sepGrupo", 2, EsString(s) => Err_EsCadena(s), , String)
+
         try {
             sepGrupo := String(sepGrupo)
             sepPartes := String(sepPartes)
