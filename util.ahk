@@ -128,6 +128,7 @@ Util() {
         @function Util_CambiarBase
 
         @description Modificar la herencia de una clase. Toda la jerarquía desde la clase hasta un ancestro o base raíz (no incluido) se convierte en heredera de una nueva base clase, dejando de heredar de base raíz. La nueva base se convierte en la clase a partir de la cual hereda toda la jerarquía que existía por debajo del ancestro base raíz.
+        La búsqueda y el recorrido de la herencia se hace usado solo la propiedad Base de las clases. Si la base del prototipo no coincide con el prototipo de la base no se tiene en cuenta. Cuando finalmente se cambia el padre de una clase, se cambia también el padre del prototipo para que apunte al prototipo del padre.
 
         @param {Class} clase - Clase a partir de la cual se va a obtener la clase inmediatamente inferior a su base raíz, siendo ésta la que cambiará su padre por la nueva base. Si la base raíz es la base inmediata (padre) de la clase, se cambia directamente la base de clase.
         @param {Clase} baseNueva - Clase que será la nueva Base.
@@ -135,8 +136,8 @@ Util() {
 
         @returns {Clase} La clase de la jerarquía que ha cambiado su Base.
 
-        @throws {ValueError/Err_ValorArgError} - Si alguno de los valores de los argumentos no cumple la condición para poder realizar el cambio.
-        @throws {TypeError/Err_TipoArgError} - Si la baseNueva o baseRaíz no son de tiop Class.
+        @throws {Error/Err_ValorArgError} - Si alguno de los valores de los argumentos no cumple la condición para poder realizar el cambio.
+        @throws {Error/Err_TipoArgError} - Si la baseNueva o baseRaíz no son de tiop Class.
 
         @todo Hacerlo genérico para cualquier árbol cuyo nodo pueda acceder al padre.
         Si se supiese el hijo de una clase, se podría hacer esta función simplemente pasando la baseRaiz y la baseNueva, de manera que se acedería al hijo de la baseRaiz y se cambiaría su base por la nueva. Si se quisiese cambiar la base directa de una clase, simplemente se pasaría como base raíz su base actual.
@@ -155,7 +156,7 @@ Util() {
                 infoError := {mensaje: "La baseNueva no puede ser descendiente de la clase", arg: baseNueva, numArg: 2}
         }
         if IsSet(infoError)
-            throw !Err_SoloErroresAHK ? Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg) : Err_Error.ExtenderErr(ValueError(infoError.mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+            throw !Err_ErroresPersonalizadosActivos ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
 
         if baseNueva == baseRaiz
             return clase
@@ -169,11 +170,12 @@ Util() {
                 else if clase.Base == Object
                     infoError := {mensaje: "La baseRaiz no es ascendente de la clase", arg: baseRaiz, numArg: 3}
                 if IsSet(infoError)
-                    throw !Err_SoloErroresAHK ? Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg) : Err_Error.ExtenderErr(ValueError(infoError.mensaje), , , ERR_ERRORES["ERR_VALOR_ARG"])
+                    throw !Err_ErroresPersonalizadosActivos ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
             } Until (clase := clase.Base).Base == baseRaiz
         }
 
         clase.Base := baseNueva
+        clase.Prototype.Base := baseNueva.Prototype
 
         return clase
     }
@@ -248,19 +250,19 @@ Util() {
         if IsSet(prop)
             Err_VerificarArgPrv(prop, "prop", 2, Es_String(s) => Err_EsCadena(s), , String)
         if IsSet(comprobarTipo) {
-            EsFuncion(f) => f is Func and f.AdmiteNumArgs(1)
-            EsFuncion.Mensaje := "No es una función o no admite un argumento"
-            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 3, EsFuncion)
+            EsFunc(f) => f is Func and f.AdmiteNumArgs(1)
+            EsFunc.Mensaje := "No es una función o no admite un argumento"
+            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 3, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
         if IsSet(validarValor) {
-            Err_VerificarArgPrv(validarValor, "validarValor", 4, EsFuncion)
+            Err_VerificarArgPrv(validarValor, "validarValor", 4, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
         }
         if IsSet(convertirValor) {
-            Err_VerificarArgPrv(convertirValor, "convertirValor", 5, EsFuncion)
+            Err_VerificarArgPrv(convertirValor, "convertirValor", 5, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
