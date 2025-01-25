@@ -39,7 +39,7 @@ if (!IsSet(__ERR_H__)) {
 
         NULL: No existe el código de error o se deconoce.
     */
-    global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3)  ; Códigos de la documentación oficial
+    global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3, "ABUELO_LLAMANTE", -4)  ; Códigos de la documentación oficial
 
     ; Flag para saber si se pueden lanzar errores personalizados tipo Err_Error y su herencia, o solo se pueden lanzar errores tipo Error. No se pasa este valor como argumento porque afecta también a get y set y no se puede pasar por argumento en estos casos. Desactivar durante la creación y definición de errores personalizados Err_Error para evitar bucles lanzando errores que justo estoy definiendo y creando. Los métodos usandos en la creación y definición de la jerarquía Err_Error tienen que tener en cuenta este flag a la hora de lanzar errores. SOLO DEBE SER USAR INTERNAMENTE POR MOTIVOS DE ESTABILIDAD.
     global Err_ErroresPersonalizadosActivos := true
@@ -112,15 +112,22 @@ if (!IsSet(__ERR_H__)) {
 
         @returns true o false.
     */
-    _Err_AdmiteNumArgs(funcion, numArgs) {
-        if !(funcion is Func)
-            Err_Lanzar(TypeError, "El argumentoo no es una función", ERR_ERRORES["ERR_ARG"])
-        
+    _Err_AdmiteNumArgsM(funcion, numArgs) {
+        ValidarNumArgs(n) => Integer(numArgs) >= 0
+        ValidarNumArgs.Mensaje := "El número de argumentos debe ser entero >= 0"
+        _Err_VerificarArgPrv(numArgs, "numArgs", 2, IsInteger, ValidarNumArgs, Integer)
+
         return funcion.MaxParams >= numArgs and funcion.MinParams <= numArgs
     }
 
+    _Err_AdmiteNumArgs(funcion, numArgs) {
+        _Err_VerificarArgPrv(funcion, "funcion", 1, Es_Funcion(f) => f is Func)
+        
+        return funcion.AdmiteNumArgs(numArgs)
+    }
+
     ; Se añade como método a Func
-    Func.Prototype.DefineProp("AdmiteNumArgs", {Call: _Err_AdmiteNumArgs})
+    Func.Prototype.DefineProp("AdmiteNumArgs", {Call: _Err_AdmiteNumArgsM})
     global Err_AdmiteNumArgs := _Err_AdmiteNumArgs
 
     
@@ -135,38 +142,44 @@ if (!IsSet(__ERR_H__)) {
 
         @returns Enumerator obtenido a partir de enum
 
-        @throws {TypeError} - Si el argumento enum no es Enumerator, no tiene un método Call ni __Enum o éste último método no devuelve un Enumerator.
-        @throws {ErrorNumArgumentos} - SI el Enumerator no admite como número de argumentos o no es número válido (entero >= 0).
+        @throws {Err_FuncArgError} - Si se lanza algún error al ejecutar enum.__Enum.
+        @throws {Err_TipoArgError} - Si el objeto devuelto por __Enum, o el propio enum en su defecto, no es llamable o no tiene el número de argumentos numArgs por referencia.
+        @throws {Err_ValueError} - Si el Enumerator no admite numArgs como número de argumentos o no es número válido entero >= 0 (se permiten enumerators con 0 argumentos).
 
         @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
     */
     _Err_VerificarEnumerator(enum, numArgs) {
-        if !IsInteger(numArgs) or (numArgs := Integer(numArgs) < 0)
-            Err_Lanzar(ErrorNumArgumentos, "El número de argumentos debe de ser un entero >= 0", ERR_ERRORES["ERR_ARG"])
+        ; numArgs se verifica en Err_AdmineNumArgs y en __Enum
 
-        try {
-            admiteNumArgs := Err_AdmiteNumArgs(enum, numArgs)
-        }
-        catch TypeError {
-            if enum.HasMethod("__Enum") {
-                try
-                    enum := enum.__Enum(numArgs)
-                catch as e {
-                    e := ;   ***** Clonar ErrNumArgs *****
-                    Err_Lanzar(e, "El Enumerator a obtener de __Enum no admite " String(numArgs) " argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
-                }
-
-                try
-                    admiteNumArgs := Err_AdmiteNumArgs(enum, numArgs)
-                catch TypeError as es
-                    Err_Lanzar(e, "El método __Enum no devuelve un Enumerator")
-            else
-                Err_Lanzar(TypeError, "Argumento enum no es Enumeratior ni tiene __Enum", ERR_ERRORES["ERR_ARG"])
+        if enum.HasMethod("__Enum") {
+            try 
+                enum := enum.__Enum(numArgs)
+            catch {
+                mensaje := "__Enum(numArgs) da error y no puede obtener ningún resultado"
+                throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : Err_FuncArgError(mensaje, , , , , e?, "enum", 1, enum.__Enum)
             }
-        }
-       
-        if !admiteNumArgs
-            Err_Lanzar(ErrorNumArgumentos, "El enumerator de enum no admite el número de argumentos", ERR_ERRORES["ERR_NUM_ARGS"])
+
+/*             ObtenerEnum(e) => e.__Enum(numArgs)
+            ObtenerEnum.Mensaje := "__Enum(numArgs) da error y no puede obtener ningún resultado",
+            enum := Err_VerificarArgPrv(enum, "enum", 1, , , ObtenerEnum)
+            mensajeBase := "El objeto obtenido de __Enum"
+ */     }
+        else
+            mensajeBase := "El propio objeto enum (no hay __Enum)"
+
+        Ll(e) => Err_EsLlamable(e)
+        Ll.Mensaje := mensajeBase " no puede ser llamado como una función"
+        enum := Err_VerificarArgPrv(enum, "enum", 1, Ll)
+
+        Ad(n) => enum.Call.AdmiteNumArgs(n)
+        Ad.Mensaje := mensajeBase "no admite el número de argumentos"
+        enum := Err_VerificarArgPrv(numArgs, "numArgs", 2, , Ad)
+
+        Loop numArgs
+            if !enum.Call.IsByRef(A_Index) {
+                mensaje := mensajeBase "no admite por referencia el parámetro #" A_Index
+                throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : Err_TipoArgError(mensaje, , , , , e?, "VarRef", A_Index)
+            }
 
         /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
 
@@ -197,9 +210,9 @@ if (!IsSet(__ERR_H__)) {
     _Err_VerificarArgPrv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
         infoFunciones := Map()
         if IsSet(comprobarTipo)
-            infoFunciones[comprobarTipo] := {codigoErr: ERR_ERRORES["ERR_TIPO_ARG"], mensaje: "El tipo del valor no cumple", tipoError: Err_TipoArgError, tipoErrorAHK: TypeError, argError: Type(valorArg)}
+            infoFunciones[comprobarTipo] := {mensaje: "El tipo del valor no cumple", tipoError: Err_TipoArgError, argError: Type(valorArg)}
         if IsSet(comprobarTipo)
-            infoFunciones[validarValor] := {codigoErr: ERR_ERRORES["ERR_VALOR_ARG"], mensaje: "El valor no cumple la validación de", tipoError: Err_ValorArgError, tipoErrorAHK: ValueError, argError: valorArg}
+            infoFunciones[validarValor] := {mensaje: "El valor no cumple la validación de", tipoError: Err_ValorArgError, argError: valorArg}
 
         for funcion, info in infoFunciones {
             try
@@ -208,8 +221,7 @@ if (!IsSet(__ERR_H__)) {
                 esCorrecto := false
          
             if !esCorrecto {
-                mensaje := "(" info.codigoErr ") " (funcion.HasProp("Mensaje") and Err_EsCadena(funcion.Mensaje) ? funcion.mensaje : info.mensaje " " funcion.Name)
-
+                mensaje := funcion.HasProp("Mensaje") and Err_EsCadena(funcion.Mensaje) ? funcion.mensaje : info.mensaje " " funcion.Name
                 throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : info.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, info.argError)
             }
         }
@@ -217,7 +229,7 @@ if (!IsSet(__ERR_H__)) {
         try
             return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
         catch as e {
-            mensaje := "El valor no se puede convertir"
+            mensaje := convertirValor.HasProp("Mensaje") and Err_EsCadena(convertirValor.Mensaje) ? convertirValor.mensaje : "El valor no se puede convertir con " convertirValor.Name
             throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : Err_ArgError(mensaje, , , , , e?, nombreArg?, posArg?)
         }
     }
@@ -243,13 +255,10 @@ if (!IsSet(__ERR_H__)) {
         @throws {ValueError/Err_ValorArgError} - Si algún argumento no ecumple la validación de valor.
     */
     _Err_VerificarArg(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
-        ; nombreArg y posArg ya se comprueban en el constructor del Error a lanzar.
-        if IsSet(nombreArg)
-            _Err_VerificarArgPrv(nombreArg, "nombreArg", 2, EsString(s) => Err_EsCadena(s), , String)
-        if IsSet(posArg)
-            _Err_VerificarArgPrv(posArg, "posArg", 3, IsInteger, Entero_mayor_que_1(v) => v >= 1)
+        ; nombreArg y posArg solo sirven de información a ser incluida en el error lanzado en caso de fallo en la verificación. Ambos ya se comprueban en el único sitio donde se usan: constructor del Error a lanzar si falla la verificación.
+
         if IsSet(comprobarTipo) {
-            EsFunc(f) => f is Func and f.AdmiteNumArgs(1)
+            EsFunc(f) => _Err_AdmiteNumArgs(f, 1)
             EsFunc.Mensaje := "No es una función o no admite un argumento"
             _Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 4, EsFunc)
 
@@ -380,17 +389,20 @@ if (!IsSet(__ERR_H__)) {
         @description Clase de la que heredarán todos los tipos de predefinidos por AHK (excepto Error).
     */
     class Err_ErrorAHK extends Err_Error {
+        /*
+            @static Constructor
+
+            @@description Define parámetros asociados a los errores AHK y cuelga toda la jerarquía de errores predefinidos (excepto Error) de Err_ErrorAHK
+        */
         static __New() {
             Err_ErroresPersonalizadosActivos := false
 
-            ; Todos los errores AHK y su código de error asociado por defecto. USO PRIVADO INTERNO EXCLUSIVAMENTE
+            ; USO PRIVADO INTERNO EXCLUSIVAMENTE
             this._ERRORES_AHK := Map(MemoryError, {nombre: "MemoryError", codigo: super.ERRORES["ERR_MEMORIA"]}, OSError, {nombre: "OSError", codigo: super.ERRORES["ERR_OS"]}, TargetError, {nombre: "TargetError", codigo: super.ERRORES["ERR_VENTANA"]}, TimeOutError, {nombre: "TimeOutError", codigo: super.ERRORES["ERR_TIEMPO_RESPUESTA"]}, TypeError, {nombre: "TypeError", codigo: super.ERRORES["ERR_TIPO"]}, UnsetError, {nombre: "UnsetError", codigo: super.ERRORES["ERR_INDEF"]}, MemberError, {nombre: "MemberError", codigo: super.ERRORES["ERR_MIEMBRO_INDEF"]}, PropertyError, {nombre: "PropertyError", codigo: super.ERRORES["ERR_PROP_INDEF"]}, MethodError, {nombre: "MethodError", codigo: super.ERRORES["ERR_METODO_INDEF"]}, UnsetItemError, {nombre: "UnsetItemError", codigo: super.ERRORES["ERR_CLAVE_INDEF"]}, ValueError, {nombre: "ValueError", codigo: super.ERRORES["ERR_VALOR"]}, IndexError, {nombre: "IndexError", codigo: super.ERRORES["ERR_INDICE"]}, ZeroDivisionError, {nombre: "ZeroDivisionError", codigo: super.ERRORES["ERR_DIV0"]})
 
-            /* Hacer que toda la jerarquía de errores predefinidos cuelgue de Err_ErrorAHK */
-            
             for tipoErrorAHK in this._ERRORES_AHK
                 if tipoErrorAHK.Base == Error
-                    tipoErrorAHK.CambiarPadre(this, Error)      
+                    tipoErrorAHK.CambiarBase(this, Error)      
 
             Err_ErroresPersonalizadosActivos := true
         }
@@ -414,11 +426,10 @@ if (!IsSet(__ERR_H__)) {
 
             ComprobarTipo(e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK)
             ComprobarTipo.Mensaje := "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"
-            tipoError := Err_VerificarArgPrv(this, "this", 1, ComprobarTipo)
-            ; *** Decidir si en los métodos, this es el argumento 0 o 1. Y decidir si VerificarArg comprueba los argumentos nombreArg y posArg que luego se vuelven a comprobar si se lanza el error.
+            tipoErrorAHK := Err_VerificarArgPrv(this, "this", 0, ComprobarTipo)
 
-            excepcion := this(mensaje?, what, extra?)
-            excepcion.Codigo := codigo ?? this._ERRORES_AHK[tipoError]
+            excepcion := tipoErrorAHK(mensaje?, what, extra?)
+            excepcion.Codigo := codigo ?? this._ERRORES_AHK[tipoErrorAHK].codigo
             excepcion.Fecha := fecha
             if IsSet(errorPrevio)
                 excepcion.ErrorPrevio := errorPrevio
@@ -447,8 +458,8 @@ if (!IsSet(__ERR_H__)) {
         static __New() {
             Err_ErroresPersonalizadosActivos := false
 
-            ValidarPos(i) => Integer(i) >= 1
-            ValidarPos.Mensaje := "La posición del argumento debe ser entero >= 1"
+            ValidarPos(i) => Integer(i) >= 0
+            ValidarPos.Mensaje := "La posición del argumento debe ser entero >= 0"
             this.Prototype.DefinePropEstandar("PosArg", Es_Entero(i) => IsInteger(i), ValidarPos, Integer)
             this.Prototype.DefinePropEstandar("NombreArg", Es_String(s) => Err_EsCadena(s), , String)
 
@@ -578,7 +589,7 @@ if (!IsSet(__ERR_H__)) {
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION_ARG"], fecha?, errorAHK?, nombreArg?, posArg?, funcion?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, funcion?) {
             super.__New(mensaje, what, extra, codigo, fecha, errorAHK, nombreArg, posArg)
             super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
         }

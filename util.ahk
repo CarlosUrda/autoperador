@@ -217,11 +217,11 @@ Util() {
     */
     _Util_Llamante() {
         try {
-            throw Error( , ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+            throw Error("", ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
         }
         catch Error as e {
-            if e.What == String(ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
-                throw Err_Error.ExtenderErr(UnsetError("No existe función llamante")) 
+            if String(e.What) == String(ERR_FUNCION_ORIGEN["PADRE_LLAMANTE"])
+                throw UnsetError.CrearErrorAHK("No existe función llamante")
             return e.What
         }
     }
@@ -245,12 +245,14 @@ Util() {
         @throws {TypeError/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
+
+        @todo Implementar la versión Prv para no tener que comprobar los argumentos de las funciones.
     */
     _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
         if IsSet(prop)
             Err_VerificarArgPrv(prop, "prop", 2, Es_String(s) => Err_EsCadena(s), , String)
         if IsSet(comprobarTipo) {
-            EsFunc(f) => f is Func and f.AdmiteNumArgs(1)
+            EsFunc(f) => Err_AdmiteNumArgs(f, 1)
             EsFunc.Mensaje := "No es una función o no admite un argumento"
             Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 3, EsFunc)
             
@@ -279,7 +281,7 @@ Util() {
         }
 
         _Set(_obj, valor) {
-            valorVerficado := Err_VerificarArgPrv(valor, "value", 2, comprobarTipo, validarValor, convertirValor)
+            valorVerficado := Err_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor)
 
             try
                 return (_obj.Base.%prop% := valorVerficado)
@@ -531,21 +533,15 @@ Util() {
 
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
-    _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
-        _Err_VerificarArgPrv(sepGrupo, "sepGrupo", 2, EsString(s) => Err_EsCadena(s), , String)
+    _Util_EnumerableACadenaM(enum, numArgs := 1, sepGrupo := ";", sepPartes := ":") {
+        enum := Err_VerificarEnumerator(enum, numArgs)
+        EsString(s) => Err_EsCadena(s)
+        EsString.Mensaje := "Los separadores deben de ser una cadena",
+        Err_VerificarArgPrv(sepGrupo, "sepGrupo", 3, EsString, , String)
+        Err_VerificarArgPrv(sepGrupo, "sepPartes", 4, EsString, , String)
 
-        try {
-            sepGrupo := String(sepGrupo)
-            sepPartes := String(sepPartes)
-        }
-        catch as e
-            throw Err_Error.ExtenderErr(e, "Los separadores deben de ser una cadena", , ERR_ERRORES["ERR_TIPO_ARG"])
-        
-        /**/ */
-        if !IsInteger(posArg) or (posArg := Integer(posArg) < 1)
-            throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número del argumento debe ser un entero >= 1")
-
-
+        if numArgs == 1
+            Format
         cadena := ""
 
         try {
@@ -576,11 +572,16 @@ Util() {
         
         return RTrim(cadena, separador " ")
     }
+
+    _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
+        Err_VerificarEnumerator(enum, numArgs)
+        enum.ToString(enum, numArgs, sepGrupo, sepPartes)
+    }
     
     ; Se añade como método a Map, Array y Enumerator
-    Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
-    Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadena})
-    Map.Prototype.DefineProp("ToString", {Call: (e, n?, s?, sc?) =>_Util_EnumerableACadena(e, m, s?, sc?)})
+    Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
+    Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
+    Map.Prototype.DefineProp("ToString", {Call: (e, n?, s?, sc?) =>_Util_EnumerableACadenaM(e, n?, s?, sc?)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
   
 
