@@ -230,27 +230,64 @@ Util() {
 
     global Util_Llamante := _Util_Llamante
 
+    /*
+        @function Util_DefinePropEstandar_Prv
 
+        @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super. Versión Prv PARA SOLO USO INTERNO. YA QUE NO COMPRUEBA NINGUNO DE LOS ARGUMENTOS.
+        - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
+        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no puede grabar el valor internamente lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación; Err_ArgError si no se puede convertir.
+
+        @param {String} prop - Nombre de la propiedad.
+        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto.
+        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto.
+        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación.
+
+        @throws {MethodError} - Si existe algún error al definir la propiedad con DefineProp.
+
+        @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
+    */
+    _Util_DefinePropEstandar_Prv(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
+        _Get(_obj) {
+            try 
+                return _obj.%"_" prop%
+            catch as e
+                throw PropertyError.CrearErrorAHK("La propiedad " prop " no tiene aún ningún valor definido", , , , , e)
+        }
+
+        _Set(_obj, valor) {
+            valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, comprobarTipo?, validarValor?, convertirValor?)
+
+            try 
+                return (_obj.%"_" prop% := valorVerficado)
+            catch as e
+                throw PropertyError.CrearErrorAHK("No se puede guardar ningún valor en la propiedad " prop, , , , , e)
+        }
+
+        try 
+            return obj.DefineProp(prop, {Get: _Get, Set: _Set})
+        catch as e
+            throw MethodError.CrearErrorAHK("No se puede definidir la propiedad " prop, , , , , e)
+    }
+
+    
     /*
         @function Util_DefinePropEstandar
 
-        @description Definir una propiedad dinámica con sus métodos get y set que gestionará una propiedad. Si no hereda la propiedad, la crea como una nueva usando una propiedad valor interna para guardar el valor. Si hereda la propiedad, respeta su comportamiento en el padre.
-        - Get lanzará PropertyError si no hereda la propiedad y el valor interno no ha sido definido; o si hereda set pero no get, respetando el comportamiento heredado.
-        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si hereda set lo usa; si no hereda set lo guarda en una propiedad valor interna excepto si hereda también get, en cuyo caso lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación.
-        En caso de heredar la propiedad con Call y no con Get, se considera como si fuese Get al usarlo sin llamada () [no hay manera de diferenciar ambas porque get puede devolver como valor una función]: devuelve como valor la función Call y no se puede grabar. Si hereda Get y Call, Get tiene prioridad sobre Call al usar la propiedad sin llamada ().
+        @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super.
+
+        - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
+        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no puede grabar el valor internamente lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación; Err_ArgError si no se puede convertir.
 
         @param {String} prop - Nombre de la propiedad.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. NOTA: No se comprueba si lanza algún error.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. NOTA: No se comprueba si lanza algún error.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación. NOTA: No se comprueba si lanza algún error.
+        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto.
+        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto.
+        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación.
 
         @throws {TypeError/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
-
-        @todo Implementar la versión Prv para no tener que comprobar los argumentos de las funciones.
     */
-    _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
+        _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
         prop := Err_VerificarArg_Prv(prop, "prop", 2, , , String)
         if IsSet(comprobarTipo) {
             EsFunc(f) => Err_AdmiteNumArgs(f, 1)
@@ -270,36 +307,12 @@ Util() {
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
 
-        _Get(_obj) {
-            if !_obj.Base.HasProp(prop) {
-                try 
-                    return _obj.%"_" prop%
-                mensaje := "La propiedad " prop " no tiene aún ningún valor definido"
-            }
-            else {
-                try
-                    return _obj.Base.%prop%
-                mensaje := "La propiedad " prop " no tiene ningún método get"
-            }
-            throw Err_Error.ExtenderErr(PropertyError(mensaje))
-        }
-
-        _Set(_obj, valor) {
-            valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, comprobarTipo?, validarValor?, convertirValor?)
-            if !_obj.Base.HasProp(prop)
-                return (_obj.%"_" prop% := valorVerficado)
-
-            try
-                return (_obj.Base.%prop% := valorVerficado)
-
-            throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor (no hay set) en la propiedad " prop))
-
-        return obj.DefineProp(prop, {Get: _Get, Set: _Set})
+        return  _Util_DefinePropEstandar_Prv(obj, prop, comprobarTipo?, validarValor?, convertirValor?)
     }
 
     _Util_DefinePropEstandar(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
         if !(obj is Object)
-            throw Err_TipoArgError("(" ERR_ERRORES["ERR_TIPO_ARG"] ") Debes pasar un Object para definir la nueva propiedad", , , ERR_ERRORES["ERR_TIPO_ARG"], , , "obj", 1, Type(obj))
+            throw Err_TipoArgError("Debes pasar un Object para definir la nueva propiedad", , , , , , "obj", 1, Type(obj))
 
         return obj.DefinePropEstandar(prop, comprobarTipo, validarValor, convertirValor)
     }

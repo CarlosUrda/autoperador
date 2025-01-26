@@ -282,6 +282,8 @@ if (!IsSet(__ERR_H__)) {
         @class Err_Error
 
         @description Error padre del que heredan todos los errores.
+
+        @todo Usar la versión privada de DefinirPropEstandar una vez se compruebe que funciona.
     */
     class Err_Error extends Error {
         static __New() {
