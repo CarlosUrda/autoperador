@@ -271,27 +271,28 @@ Util() {
         }
 
         _Get(_obj) {
-            try 
-                return _obj.%"_" prop%
-
-            try
-                return _obj.Base.%prop%
-
-            mensaje := "La propiedad " prop " no tiene " (!_obj.Base.HasProp(prop) ? "aún ningún valor definido" : "ningún método get")
+            if !_obj.Base.HasProp(prop) {
+                try 
+                    return _obj.%"_" prop%
+                mensaje := "La propiedad " prop " no tiene aún ningún valor definido"
+            }
+            else {
+                try
+                    return _obj.Base.%prop%
+                mensaje := "La propiedad " prop " no tiene ningún método get"
+            }
             throw Err_Error.ExtenderErr(PropertyError(mensaje))
         }
 
         _Set(_obj, valor) {
             valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, comprobarTipo?, validarValor?, convertirValor?)
+            if !_obj.Base.HasProp(prop)
+                return (_obj.%"_" prop% := valorVerficado)
 
             try
                 return (_obj.Base.%prop% := valorVerficado)
 
-            if !_obj.Base.HasProp(prop)
-                return (_obj.%"_" prop% := valorVerficado)
-            
             throw Err_Error.ExtenderErr(PropertyError("No se puede guardar ningún valor (no hay set) en la propiedad " prop))
-        }
 
         return obj.DefineProp(prop, {Get: _Get, Set: _Set})
     }
