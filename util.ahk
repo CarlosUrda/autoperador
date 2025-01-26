@@ -55,13 +55,15 @@ Util() {
             throw Err_Error.ExtenderErr(TypeError("El tipo del valor no es una Clase"))
         if clase.Prototype != valor.Base
             throw Err_Error.ExtenderErr(TypeError("El prototipo de la clase tipo no coincide con la base prototipo del valor. Es decir, el objeto no se creó a partir del prototipo del tipo clase."))
+
+        return clase
     }
 
     Object.Prototype.DefineProp("Clase", {Call: Util_Clase})
 
 
     /*
-        @function Util_EsBasePrv
+        @function Util_EsBase_Prv
 
         @description Saber si un objeto clase es ancestro (se hereda de él). Esta función no verifica los argumentos, por lo que SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
 
@@ -70,7 +72,7 @@ Util() {
 
         @returns {Boolean} - Devuelve true o false si es ancestro o no.
     */
-    _Util_EsBasePrv(clase, baseRaiz) {
+    _Util_EsBase_Prv(clase, baseRaiz) {
         if clase == baseRaiz or baseRaiz.Base == clase
             return false
 
@@ -92,12 +94,12 @@ Util() {
         @returns {Boolean} - Devuelve true o false si es ancestro o no.        
     */
     _Util_EsBaseM(clase, baseRaiz) {
-        Err_VerificarArgPrv(baseRaiz, "baseRaiz", 2, Es_Clase(o) => o is Class)
-        return _Util_EsBasePrv(clase, baseRaiz)
+        Err_VerificarArg_Prv(baseRaiz, "baseRaiz", 2, Es_Clase(o) => o is Class)
+        return _Util_EsBase_Prv(clase, baseRaiz)
     }
 
     _Util_EsBase(clase, baseRaiz) {
-        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)
+        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)
         return clase.EsAncestro(baseRaiz)
     }
 
@@ -111,12 +113,12 @@ Util() {
         @description Saber si un objeto clase es descendiente o heredero.
     */
     _Util_EsDescendienteM(clase, descendiente) {
-        Err_VerificarArgPrv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
-        return _Util_EsBasePrv(descendiente, clase)
+        Err_VerificarArg_Prv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
+        return _Util_EsBase_Prv(descendiente, clase)
     }
 
     _Util_EsDescendiente(clase, descendiente) {
-        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)      
+        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)      
         return clase.EsDescendiente(descendiente)
     }
 
@@ -147,13 +149,13 @@ Util() {
             case clase == Object or clase == Any:
                 infoError := {mensaje: "Ni Object ni Any pueden cambiar de base", nombreArg: "this", valorArg: clase, numArg: 1}
             case baseNueva == clase:
-                infoError := {mensaje: "La baseNueva no puede ser la misma que clase", arg: baseNueva, numArg: 2}
+                infoError := {mensaje: "La baseNueva no puede ser la misma que clase", nombreArg: "baseNueva", numArg: 2, valorArg: baseNueva}
             case baseRaiz == clase:
-                infoError := {mensaje: "La baseRaiz no puede ser la misma que clase", arg: baseRaiz, numArg: 3}
+                infoError := {mensaje: "La baseRaiz no puede ser la misma que clase", nombreArg: "baseRaiz", numArg: 3, valorArg: baseRaiz}
             case baseRaiz == Any:
-                infoError := {mensaje: "La baseRaiz no puede ser Any", arg: baseRaiz, numArg: 3}
+                infoError := {mensaje: "La baseRaiz no puede ser Any", nombreArg: "baseRaiz", numArg: 3, valorArg: baseRaiz}
             case clase.EsDescendiente(baseNueva): ; Se comprueba además si baseNueva es Class
-                infoError := {mensaje: "La baseNueva no puede ser descendiente de la clase", arg: baseNueva, numArg: 2}
+                infoError := {mensaje: "La baseNueva no puede ser descendiente de la clase", nombreArg: "baseNueva", numArg: 2, valorArg: baseNueva}
         }
         if IsSet(infoError)
             throw !Err_ErroresPersonalizadosActivos ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
@@ -162,7 +164,7 @@ Util() {
             return clase
 
         if baseRaiz != clase.Base {
-            Err_VerificarArgPrv(baseRaiz, "baseRaiz", 3, Es_Clase(o) => o is Class)
+            Err_VerificarArg_Prv(baseRaiz, "baseRaiz", 3, Es_Clase(o) => o is Class)
 
             Loop { ; Loop en lugar de while para aprovechar la comparación anterior necesaria.
                 if clase.Base == baseNueva
@@ -181,7 +183,7 @@ Util() {
     }
     
     _Util_CambiarBase(clase, baseNueva, baseRaiz?) {
-        Err_VerificarArgPrv(clase, "clase", 1, Es_Clase(o) => o is Class)
+        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)
         
         return clase.CambiarBase(baseNueva, baseRaiz?)
     }
@@ -249,22 +251,21 @@ Util() {
         @todo Implementar la versión Prv para no tener que comprobar los argumentos de las funciones.
     */
     _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
-        if IsSet(prop)
-            Err_VerificarArgPrv(prop, "prop", 2, Es_String(s) => Err_EsCadena(s), , String)
+        prop := Err_VerificarArg_Prv(prop, "prop", 2, , , String)
         if IsSet(comprobarTipo) {
             EsFunc(f) => Err_AdmiteNumArgs(f, 1)
             EsFunc.Mensaje := "No es una función o no admite un argumento"
-            Err_VerificarArgPrv(comprobarTipo, "comprobarTipo", 3, EsFunc)
+            Err_VerificarArg_Prv(comprobarTipo, "comprobarTipo", 3, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
         }
         if IsSet(validarValor) {
-            Err_VerificarArgPrv(validarValor, "validarValor", 4, EsFunc)
+            Err_VerificarArg_Prv(validarValor, "validarValor", 4, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
         }
         if IsSet(convertirValor) {
-            Err_VerificarArgPrv(convertirValor, "convertirValor", 5, EsFunc)
+            Err_VerificarArg_Prv(convertirValor, "convertirValor", 5, EsFunc)
             
             /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
         }
@@ -281,7 +282,7 @@ Util() {
         }
 
         _Set(_obj, valor) {
-            valorVerficado := Err_VerificarArgPrv(valor, "value", 1, comprobarTipo, validarValor, convertirValor)
+            valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, comprobarTipo?, validarValor?, convertirValor?)
 
             try
                 return (_obj.Base.%prop% := valorVerficado)
@@ -522,66 +523,51 @@ Util() {
     /*
         @function Util_EnumerableACadena
         
-        @description Obtener una cadena a partir de los valores de objeto enumerable <__Enum> o Enumerator.
+        @description Obtener una cadena a partir de los valores de objeto enumerable <__Enum> o Enumerator (llamable cuyos argumentos son VarRef) .
 
-        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable cuyos valores se van a convertir a una cadena.
-        @param {Boolean} numArgs - Número de argumentos que admitirá el enumerable.
+        @param {Object<__Enum>|Enumerator} enum - Objeto enumerable cuyos valores se van a convertir a una cadena.
+        @param {Integer} numArgs - Número de argumentos que admitirá el enumerable por cada elemento. Puede ser 0 si el enum no tiene argumentos, pero devuelve una cadena vacía.
         @param {String} sepGrupo - cadena para separar los grupos de valores obtenidos en cada llamada al enumerable. Separador entre entradas.
         @param {String} sepPartes - cadena para separar cada uno de los valores obtenidos en una llamada al enumerable. Separador entre elementos de una entrada. Si numArgs == 1 se ignora.
 
-        @throws {TypeError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
 
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
     _Util_EnumerableACadenaM(enum, numArgs := 1, sepGrupo := ";", sepPartes := ":") {
-        enum := Err_VerificarEnumerator(enum, numArgs)
-        EsString(s) => Err_EsCadena(s)
-        EsString.Mensaje := "Los separadores deben de ser una cadena",
-        Err_VerificarArgPrv(sepGrupo, "sepGrupo", 3, EsString, , String)
-        Err_VerificarArgPrv(sepGrupo, "sepPartes", 4, EsString, , String)
+        Ve(e) => Err_VerificarEnumerable(e, numArgs)
+        Ve.Mensaje := "Enumerable no válido: número de argumentos incompatible o tipo de objeto incorrecto"
+        enum := Err_VerificarArg_Prv(enum, "enum", 1, , , Ve)
+        S(s) => String(s)
+        S.Mensaje := "Los separadores deben de ser una cadena",
+        sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, , , S)
+        sepPartes := Err_VerificarArg_Prv(sepPartes, "sepPartes", 4, , , S)
 
-        if numArgs == 1
-            Format
+        valoresRef := Array()
+        Loop numArgs
+            valoresRef.Push(Util_CrearVarRef())
+
         cadena := ""
+        while enum(valoresRef*) {
+            for valorRef in valoresRef
+                cadena .= (%valorRef% ?? "") sepPartes " "
 
-        try {
-            if mostrarClaves {
-                for clave, valor in enum {
-                    indice := clave
-                    cadena .= String(clave) separadorClave " " (IsSet(valor) ? String(valor) : "") separador " "
-                }
-            }
-            else {
-                for i, valor in enum {
-                    indice := i
-                    cadena .= IsSet(valor) ? String(valor) separador " " : ""
-                }
-            }
+            cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
         }
-        catch TypeError as e
-            Err_Lanzar(e, "El argumento enum debe ser enumerable (Object<__Enum> o Enumerator)", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        catch MethodError as e
-            Err_Lanzar(e, "El valor índice " indice " de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        catch as e {
-            try
-                for valor in enum
-                    cadena .= (IsSet(valor) ? String(valor) : "") separador " "
-            catch MethodError as e
-                Err_Lanzar(e, "Un valor de la lista no puede convertirse a String", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        }
-        
-        return RTrim(cadena, separador " ")
+
+        return RTrim(cadena, sepGrupo " ")
     }
 
     _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
-        Err_VerificarEnumerator(enum, numArgs)
+        Err_VerificarEnumerable(enum, numArgs)
         enum.ToString(enum, numArgs, sepGrupo, sepPartes)
     }
     
     ; Se añade como método a Map, Array y Enumerator
     Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
-    Map.Prototype.DefineProp("ToString", {Call: (e, n?, s?, sc?) =>_Util_EnumerableACadenaM(e, n?, s?, sc?)})
+    Map.Prototype.DefineProp("ToString", {Call: (m, n?, sg?, sp?) => _Util_EnumerableACadenaM(m, n ?? 2, sg?, sp?)})
     global Util_EnumerableACadena := _Util_EnumerableACadena
   
 
@@ -734,36 +720,35 @@ Util() {
 
     /*
         @function Util_ContieneValor
-        @description Comprueba si un elemento está dentro de los valores de un objeto enumerable (Enumerator u objeto con método __Enum). En caso de admitir el enum dos argumentos, como Map o Array, comprueba los valores (2º argumento) y no las claves o índices.
+        @description Comprueba si un elemento está dentro de los valores de un objeto enumerable.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
         @param {Any} valor - valor a comprobar si está dentro del enum.
+        @param {Integer} numArgs - Número de argumentos >= 1 que admite el enumerable por cada elemento.
+        @param {Integer} posValor - Posición de los argumentos del enumerable a comparar el valor.
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
-        @throws {TypeError} - Si el argumento enum no es un objeto Enumerable o __Enum
-
-        @todo Comprobar el tipo concreto de excepción que lanza el for en los siguientes casos:
-        - El argumento enum no ser enumerable.
-        - En caso de ser enumerable no admitir dos argumentos.
+        @throws {Err_TipoArgError} - Si el tipo de algún argumento es incorrecto.
+        @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
+        @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
     */
-    _Util_ContieneValor(enum, valor) {
-        try {
-            for , _valor in enum 
-                if IsSet(_valor) and (_valor == valor)
-                    return true
-        }
-        ; TypeError se captura si enum no es Enumerator, no tiene función __Enum o ésta no devuelve Enumerator
-        catch TypeError as e {
-            Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que devuelva Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        }
-        ; Aquí solo debe entrar porque enum no admite dos argumentos.
-        catch {
-            ; Este bucle ya no debe lanzar más excepciones porque, en teoría, no hay excepciones en ahk por comparar tipos distintos.
-            for _valor in enum 
-                if IsSet(_valor) and (_valor == valor)
-                    return true
-        }
+    _Util_ContieneValor(enum, valor, numArgs := 2, posValor := 2) {
+        Ve(e) => Err_VerificarEnumerable(e, numArgs)
+        Ve.Mensaje := "Enumerable no válido: número de argumentos incompatible o tipo de objeto incorrecto"
+        enum := Err_VerificarArg_Prv(enum, "enum", 1, , , Ve)
+
+        Vp(pos) => pos >= 1 and pos <= numArgs
+        Vp.Mensaje := "La posición del valor tiene que estar entre 1 y el número de argumentos"
+        Err_VerificarArg_Prv(posValor, "posValor", 4, IsInteger, Vp, Integer)
+
+        valoresRef := Array()
+        Loop numArgs
+            valoresRef.Push(Util_CrearVarRef())
+
+        while enum(valoresRef*)
+            if IsSet(%valoresRef[posValor]%) and %valoresRef[posValor]% == valor
+                return true
 
         return false
     }
