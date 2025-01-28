@@ -158,7 +158,7 @@ Util() {
                 infoError := {mensaje: "La baseNueva no puede ser descendiente de la clase", nombreArg: "baseNueva", numArg: 2, valorArg: baseNueva}
         }
         if IsSet(infoError)
-            throw !Err_ErroresPersonalizadosActivos ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
+            throw !Err_ErroresPersonalizadosActivo ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
 
         if baseNueva == baseRaiz
             return clase
@@ -172,7 +172,7 @@ Util() {
                 else if clase.Base == Object
                     infoError := {mensaje: "La baseRaiz no es ascendente de la clase", arg: baseRaiz, numArg: 3}
                 if IsSet(infoError)
-                    throw !Err_ErroresPersonalizadosActivos ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
+                    throw !Err_ErroresPersonalizadosActivo ? Error(infoError.mensaje) : Err_ValorArgError(infoError.mensaje, , , , , , infoError.nombreArg, infoError.numArg, infoError.valorArg)
             } Until (clase := clase.Base).Base == baseRaiz
         }
 

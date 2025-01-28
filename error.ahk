@@ -23,7 +23,7 @@
 #Requires AutoHotkey v2.0
 
 
-if (!IsSet(__ERR_H__)) {
+if (!IsSet(__ERR_H__)) 
     global __ERR_H__ := true
 
     /*** VALORES GLOBALES Y CÓDIGOS DE ERRORES ***/
@@ -42,7 +42,7 @@ if (!IsSet(__ERR_H__)) {
     global ERR_FUNCION_ORIGEN := Map("ACTUAL", -1, "LLAMANTE", -2, "PADRE_LLAMANTE", -3, "ABUELO_LLAMANTE", -4)  ; Códigos de la documentación oficial
 
     ; Flag para saber si se pueden lanzar errores personalizados tipo Err_Error y su herencia, o solo se pueden lanzar errores tipo Error. No se pasa este valor como argumento porque afecta también a get y set y no se puede pasar por argumento en estos casos. Desactivar durante la creación y definición de errores personalizados Err_Error para evitar bucles lanzando errores que justo estoy definiendo y creando. Los métodos usandos en la creación y definición de la jerarquía Err_Error tienen que tener en cuenta este flag a la hora de lanzar errores. SOLO DEBE SER USAR INTERNAMENTE POR MOTIVOS DE ESTABILIDAD.
-    global Err_ErroresPersonalizadosActivos := true
+    global Err_ErroresPersonalizadosActivo := true
 
 
 
@@ -56,12 +56,7 @@ if (!IsSet(__ERR_H__)) {
 
         @param {Error} e - Objeto clase Error con la información de la excepción.
     */
-    global Err_MsgBox := e => MsgBox(String(e), )
-    excepcion := TypeError("(" ERR_ERRORES["ERR_ARG"] ") El tipo de excepción a lanzar no es clase Error.", ERR_FUNCION_ORIGEN["ACTUAL"], FormatTime(A_Now, "dd/MM/yyyy HH:mm:ss:") A_ThisFunc " (L " A_LineNumber ") [" RegExReplace(A_LineFile, ".*[\\/]", "") "]")
-    nombreArchivo := RegExReplace(String(script), ".*[\\/]", "")
-
-    ; Se añade Err_MsgBox como método a Error
-    Error.Prototype.DefineProp("MsgBox", {Call: Err_MsgBox})
+    Err_Error.Prototype.DefineProp("MsgBox", {Call: (e) => MsgBox(e)})
 
 
 
@@ -216,7 +211,7 @@ if (!IsSet(__ERR_H__)) {
             if !esCorrecto {
                 ; Se usa Err_EsCadena porque no queremos lanzar más excepciones llegados a este punto.
                 mensaje := funcion.HasProp("Mensaje") and Err_EsCadena(funcion.Mensaje) ? String(funcion.Mensaje) : info.mensaje " " funcion.Name
-                throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : info.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, info.argError)
+                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : info.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, info.argError)
             }
         }
 
@@ -224,7 +219,7 @@ if (!IsSet(__ERR_H__)) {
             return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
         catch as e {
             mensaje := convertirValor.HasProp("Mensaje") and Err_EsCadena(convertirValor.Mensaje) ? String(convertirValor.Mensaje) : "El valor no se puede convertir con " convertirValor.Name
-            throw !Err_ErroresPersonalizadosActivos ? Error(mensaje) : Err_ArgError(mensaje, , , , , e?, nombreArg?, posArg?)
+            throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_ArgError(mensaje, , , , , e?, nombreArg?, posArg?)
         }
     }
 
@@ -287,36 +282,36 @@ if (!IsSet(__ERR_H__)) {
     */
     class Err_Error extends Error {
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
-            this.ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERR_ERROR", -1, "ERR_ARG", -2, "ERR_VALOR", -3, "ERR_VALOR_ARG", -4, "ERR_TIPO", -5, "ERR_TIPO_ARG", -6, "ERR_ARCHIVO", -7, "ERR_OBJETO", -8, "ERR_INDICE", -9, "ERR_FUNCION", -10, "ERR_FUNCION_ARG", -11, "ERR_NUM_ARGS", -12, "ERR_INDEF", -13, "ERR_PROP_INDEF", -14, "ERR_MIEMBRO_INDEF", -15, "ERR_METODO_INDEF", -16, "ERR_CLAVE_INDEF", -17, "ERR_MEMORIA", -18, "ERR_OS", -19, "ERR_VENTANA", -20, "ERR_TIEMPO_RESPUESTA", -21, "ERR_DIV0", -22)
+            this.ERRORES := Map("NULL", 0, "CORRECTO", 1, "ERROR", -1, "ARG", -2, "VALOR", -3, "VALOR_ARG", -4, "TIPO", -5, "TIPO_ARG", -6, "ARCHIVO", -7, "OBJETO", -8, "INDICE", -9, "FUNCION", -10, "FUNCION_ARG", -11, "NUM_ARGS", -12, "INDEF", -13, "PROP_INDEF", -14, "MIEMBRO_INDEF", -15, "METODO_INDEF", -16, "CLAVE_INDEF", -17, "MEMORIA", -18, "OS", -19, "VENTANA", -20, "TIEMPO_RESPUESTA", -21, "DIV0", -22)
             ; *** Si ACCIONES e INFO_CODIGO no se termina usando, quitarlo ***
             this.ACCIONES := Map("NULL", NULL, "CONTINUAR", 1, "PARAR_FUNCION", 2, "PARAR_PROGRAMA", 3)
             this.INFO_CODIGOS := Map(
                 this.ERRORES["NULL"], Map("nombre", "NULL", "accion", this.ACCIONES["NULL"], "mensaje", NULL),
                 this.ERRORES["CORRECTO"], Map("nombre", "CORRECTO", "accion", this.ACCIONES["CONTINUAR"], "mensaje", "Ejecución realizada correcta"),
-                this.ERRORES["ERR_ERROR"], Map("nombre", "ERR_ERROR", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error"),
-                this.ERRORES["ERR_ARG"], Map("nombre", "ERR_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo"),
-                this.ERRORES["ERR_VALOR"], Map("nombre", "ERR_VALOR", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
-                this.ERRORES["ERR_VALOR_ARG"], Map("nombre", "ERR_VALOR_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor de argumento erróneo"),
-                this.ERRORES["ERR_TIPO"], Map("nombre", "ERR_TIPO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo"),
-                this.ERRORES["ERR_TIPO_ARG"], Map("nombre", "ERR_TIPO_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato de argumento erróneo"),
-                this.ERRORES["ERR_ARCHIVO"], Map("nombre", "ERR_ARCHIVO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo"),
-                this.ERRORES["ERR_OBJETO"], Map("nombre", "ERR_OBJETO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto"),
-                this.ERRORES["ERR_INDICE"], Map("nombre", "ERR_INDICE", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Índice erróneo o sin valor definido"),
-                this.ERRORES["ERR_FUNCION"], Map("nombre", "ERR_FUNCION", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
-                this.ERRORES["ERR_FUNCION_ARG"], Map("nombre", "ERR_FUNCION_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función pasada por argumento"),
-                this.ERRORES["ERR_NUM_ARGS"], Map("nombre", "ERR_NUM_ARGS", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados"),
-                this.ERRORES["ERR_INDEF"], Map("nombre", "ERR_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor no definido"),
-                this.ERRORES["ERR_PROP_INDEF"], Map("nombre", "ERR_PROP_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "La propiedad no tiene ningún valor"),
-                this.ERRORES["ERR_MIEMBRO_INDEF"], Map("nombre", "ERR_MIEMBRO_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el miembro"),
-                this.ERRORES["ERR_METODO_INDEF"], Map("nombre", "ERR_METODO_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el método"),
-                this.ERRORES["ERR_CLAVE_INDEF"], Map("nombre", "ERR_CLAVE_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el elemento indexado por clave"),
-                this.ERRORES["ERR_MEMORIA"], Map("nombre", "ERR_MEMORIA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error de memoria"),
-                this.ERRORES["ERR_OS"], Map("nombre", "ERR_OS", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error del S.O."),
-                this.ERRORES["ERR_VENTANA"], Map("nombre", "ERR_VENTANA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error de ventana o de alguno de sus componentes"),
-                this.ERRORES["ERR_TIEMPO_RESPUESTA"], Map("nombre", "ERR_TIEMPO_RESPUESTA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tiempo de respuesta agotado"),
-                this.ERRORES["ERR_DIV0"], Map("nombre", "ERR_DIV0", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "División por 0")
+                this.ERRORES["ERROR"], Map("nombre", "ERROR", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error"),
+                this.ERRORES["ARG"], Map("nombre", "ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Argumento erróneo"),
+                this.ERRORES["VALOR"], Map("nombre", "VALOR", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor erróneo"),
+                this.ERRORES["VALOR_ARG"], Map("nombre", "VALOR_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor de argumento erróneo"),
+                this.ERRORES["TIPO"], Map("nombre", "TIPO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato erróneo"),
+                this.ERRORES["TIPO_ARG"], Map("nombre", "TIPO_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tipo de dato de argumento erróneo"),
+                this.ERRORES["ARCHIVO"], Map("nombre", "ARCHIVO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error al gestionar un archivo"),
+                this.ERRORES["OBJETO"], Map("nombre", "OBJETO", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error al crear un objeto"),
+                this.ERRORES["INDICE"], Map("nombre", "INDICE", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Índice erróneo o sin valor definido"),
+                this.ERRORES["FUNCION"], Map("nombre", "FUNCION", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función"),
+                this.ERRORES["FUNCION_ARG"], Map("nombre", "FUNCION_ARG", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error en la función pasada por argumento"),
+                this.ERRORES["NUM_ARGS"], Map("nombre", "NUM_ARGS", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Número incorrecto de argumentos pasados"),
+                this.ERRORES["INDEF"], Map("nombre", "INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Valor no definido"),
+                this.ERRORES["PROP_INDEF"], Map("nombre", "PROP_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "La propiedad no tiene ningún valor"),
+                this.ERRORES["MIEMBRO_INDEF"], Map("nombre", "MIEMBRO_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el miembro"),
+                this.ERRORES["METODO_INDEF"], Map("nombre", "METODO_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el método"),
+                this.ERRORES["CLAVE_INDEF"], Map("nombre", "CLAVE_INDEF", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "No existe el elemento indexado por clave"),
+                this.ERRORES["MEMORIA"], Map("nombre", "MEMORIA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error de memoria"),
+                this.ERRORES["OS"], Map("nombre", "OS", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error del S.O."),
+                this.ERRORES["VENTANA"], Map("nombre", "VENTANA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Error de ventana o de alguno de sus componentes"),
+                this.ERRORES["TIEMPO_RESPUESTA"], Map("nombre", "TIEMPO_RESPUESTA", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "Tiempo de respuesta agotado"),
+                this.ERRORES["DIV0"], Map("nombre", "DIV0", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "División por 0")
             )
         
             /* Se añaden las propiedades nuevas al prototipo de Err_Error */
@@ -341,7 +336,7 @@ if (!IsSet(__ERR_H__)) {
             ComprobarError.Mensaje := "La excepción previa tiene que ser tipo Error"
             this.Prototype.DefinePropEstandar("ErrorPrevio", ComprobarError)
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -357,15 +352,15 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la fecha no tiene el formato correcto.
         */
-        __New(mensaje, what := ERR_FUNCION_ORIGEN["ACTUAL"], extra?, codigo := ERR_ERRORES["ERR_ERROR"], fecha := A_Now, errorPrevio?) {
+        __New(mensaje, what := ERR_FUNCION_ORIGEN["ACTUAL"], extra?, codigo := ERR_ERRORES["ERROR"], fecha := A_Now, errorPrevio?) {
             ; AHK no lanza un nuevo Error si falla la creación de super. Termina el programa evitando posibles bucles.
             super.__New(mensaje, what, extra?)
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
             this.Codigo := codigo
             this.Fecha := fecha
             if IsSet(errorPrevio)
                 this.ErrorPrevio := errorPrevio
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
 
@@ -374,16 +369,16 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String (no se muestra la pila Stack)
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
             texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
     
-            _texto := "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Message) ". " String(this.Extra) . texto "'r'n"
+            texto := "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Message) ". " String(this.Extra) . texto "'r'n"
             try
-                _texto .= "Previo => " this.ErrorPrevio "'r'n"
+                texto .= "Previo => " this.ErrorPrevio "'r'n"
             
-            return _texto
+            return texto
         }
     }
 
@@ -400,16 +395,16 @@ if (!IsSet(__ERR_H__)) {
             @@description Define parámetros asociados a los errores AHK y cuelga toda la jerarquía de errores predefinidos (excepto Error) de Err_ErrorAHK
         */
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
             ; USO PRIVADO INTERNO EXCLUSIVAMENTE
-            this._ERRORES_AHK := Map(MemoryError, {nombre: "MemoryError", codigo: super.ERRORES["ERR_MEMORIA"]}, OSError, {nombre: "OSError", codigo: super.ERRORES["ERR_OS"]}, TargetError, {nombre: "TargetError", codigo: super.ERRORES["ERR_VENTANA"]}, TimeOutError, {nombre: "TimeOutError", codigo: super.ERRORES["ERR_TIEMPO_RESPUESTA"]}, TypeError, {nombre: "TypeError", codigo: super.ERRORES["ERR_TIPO"]}, UnsetError, {nombre: "UnsetError", codigo: super.ERRORES["ERR_INDEF"]}, MemberError, {nombre: "MemberError", codigo: super.ERRORES["ERR_MIEMBRO_INDEF"]}, PropertyError, {nombre: "PropertyError", codigo: super.ERRORES["ERR_PROP_INDEF"]}, MethodError, {nombre: "MethodError", codigo: super.ERRORES["ERR_METODO_INDEF"]}, UnsetItemError, {nombre: "UnsetItemError", codigo: super.ERRORES["ERR_CLAVE_INDEF"]}, ValueError, {nombre: "ValueError", codigo: super.ERRORES["ERR_VALOR"]}, IndexError, {nombre: "IndexError", codigo: super.ERRORES["ERR_INDICE"]}, ZeroDivisionError, {nombre: "ZeroDivisionError", codigo: super.ERRORES["ERR_DIV0"]})
+            this._ERRORES_AHK := Map(MemoryError, {nombre: "MemoryError", codigo: super.ERRORES["MEMORIA"]}, OSError, {nombre: "OSError", codigo: super.ERRORES["OS"]}, TargetError, {nombre: "TargetError", codigo: super.ERRORES["VENTANA"]}, TimeOutError, {nombre: "TimeOutError", codigo: super.ERRORES["TIEMPO_RESPUESTA"]}, TypeError, {nombre: "TypeError", codigo: super.ERRORES["TIPO"]}, UnsetError, {nombre: "UnsetError", codigo: super.ERRORES["INDEF"]}, MemberError, {nombre: "MemberError", codigo: super.ERRORES["MIEMBRO_INDEF"]}, PropertyError, {nombre: "PropertyError", codigo: super.ERRORES["PROP_INDEF"]}, MethodError, {nombre: "MethodError", codigo: super.ERRORES["METODO_INDEF"]}, UnsetItemError, {nombre: "UnsetItemError", codigo: super.ERRORES["CLAVE_INDEF"]}, ValueError, {nombre: "ValueError", codigo: super.ERRORES["VALOR"]}, IndexError, {nombre: "IndexError", codigo: super.ERRORES["INDICE"]}, ZeroDivisionError, {nombre: "ZeroDivisionError", codigo: super.ERRORES["DIV0"]})
 
             for tipoErrorAHK in this._ERRORES_AHK
                 if tipoErrorAHK.Base == Error
                     tipoErrorAHK.CambiarBase(this, Error)      
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
         
         /*
@@ -427,7 +422,7 @@ if (!IsSet(__ERR_H__)) {
             @returns {Subclass<Err_ErrorAHK>} Excepción creada.
         */
         static CrearErrorAHK(mensaje?, what := ERR_FUNCION_ORIGEN["LLAMANTE"], extra?, codigo?, fecha := A_Now, errorPrevio?) {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
             ComprobarTipo(e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK)
             ComprobarTipo.Mensaje := "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"
@@ -439,7 +434,7 @@ if (!IsSet(__ERR_H__)) {
             if IsSet(errorPrevio)
                 excepcion.ErrorPrevio := errorPrevio
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
 
             return excepcion
         }            
@@ -461,7 +456,7 @@ if (!IsSet(__ERR_H__)) {
     */
     class Err_ArgError extends Err_ErrorNoAHK { 
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
             VP(i) => Integer(i) >= 0
             VP.Mensaje := "La posición del argumento debe ser entero >= 0 (0 para this)"
@@ -471,7 +466,7 @@ if (!IsSet(__ERR_H__)) {
             S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
             this.Prototype.DefinePropEstandar("NombreArg", , , S)
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -489,17 +484,17 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ARG"], fecha?, errorPrevio?, nombreArg?, posArg?) {
             super.__New(mensaje, what, extra, codigo, fecha)
 
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
             if IsSet(nombreArg)
                 this.NombreArg := nombreArg
             if IsSet(posArg)
                 this.PosArg := posArg
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -507,14 +502,14 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String.
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
             texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
             try
                 _texto := ". NombreArg: " this.NombreArg
             try
-                _texto := ". #Arg: " this.PosArg
+                _texto .= ". #Arg: " this.PosArg
 
             return super.ToString((_texto ?? "") . texto)
         }
@@ -522,13 +517,13 @@ if (!IsSet(__ERR_H__)) {
 
     class Err_TipoArgError extends Err_ArgError {
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
             EsClase(s) => %String(s)% is Class
             EsClase.Mensaje := "La cadena tipo de dato no representa ninguna Clase"
             this.Prototype.DefinePropEstandar("TipoArg", , EsClase, String)
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -547,12 +542,12 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_TIPO_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, tipoArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["TIPO_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, tipoArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
             if IsSet(tipoArg)
                 this.TipoArg := tipoArg
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -560,7 +555,7 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String.
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
             texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
@@ -573,9 +568,9 @@ if (!IsSet(__ERR_H__)) {
 
     class Err_ValorArgError extends Err_ArgError {
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
             this.Prototype.DefinePropEstandar("ValorArg")
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -594,7 +589,7 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_VALOR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["VALOR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
             super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
             if IsSet(valorArg)
                 this.ValorArg := valorArg           
@@ -605,12 +600,12 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String.
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
             texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
             try
-                _texto := ". ValorArg: " Err_EsCadena(this.ValorArg) ? String(this.ValorArg) : " **** "
+                _texto := ". ValorArg: " Err_EsCadena(this.ValorArg) ? String(this.ValorArg) : " <No imprimible> "
 
             return super.ToString((_texto ?? "") . texto)
         }
@@ -621,26 +616,39 @@ if (!IsSet(__ERR_H__)) {
 
     class Err_FuncError extends Err_ErrorNoAHK {
         static __New() {
-            Err_ErroresPersonalizadosActivos := false
+            Err_ErroresPersonalizadosActivo := false
 
-            EsClase(s) => %String(s)% is Class
-            EsClase.Mensaje := "La cadena tipo de dato no representa ninguna Clase"
-            this.Prototype.DefinePropEstandar("NombreFunc", , EsClase, String)
+            EsFunc(f) => f is Func
+            EsFunc.Mensaje := "No has pasado una función relacionada con el error"
+            this.Prototype.DefinePropEstandar("Funcion", EsFunc)
 
-            Err_ErroresPersonalizadosActivos := true
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
             @method Constructor
 
-            @throws {TypeError} - Si los argumentos no tienen tipos correctos
-
+            @param {String} mensaje - Mensaje a guardar en la propiedad Message ya existente en la excepción.
+            @param {String} what - Info a guardr rn la propiedad What ya existente en la excepción.
+            @param {String} extra - Info extra a guardr rn la propiedad Extra ya existente en la excepción.
+            @param {String} codigo - Código del tipo de error. Se deja String para dar la posiblida de introducir letras como código. Se guarda como nueva propiedad Codigo.
+            @param {String} fecha - Fecha en formato YYYYMMDDHH24MISS. Se guarda como nueva propiedad Fecha.
             @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
+            @param {Func} funcion - Función relacionada con el error.
+            
 
+            @throws {TypeError} - Si los argumentos no tienen tipos correctos
+            @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_FUNCION"], fecha?, errorPrevio?, funcion?) {
-            super.__New(mensaje, what, extra, codigo, fecha)
-            super._NuevasPropsCadena(Map("funcion", funcion ?? ""), !IsSet(extra))
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["FUNCION"], fecha?, errorPrevio?, funcion?) {
+            super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?)
+
+            Err_ErroresPersonalizadosActivo := false
+            
+            if IsSet(funcion)
+                this.Funcion := funcion
+
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -648,15 +656,28 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String.
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
-            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
-        ToString(texto := "", extra := false) {
-            return super.ToString("- Func: " this.Funcion " " texto, extra)
+        ToString(texto?) {
+            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
+            try
+                _texto := ". NombreFuncion: " this.Funcion.Name
+
+            return super.ToString((_texto ?? "") . texto)
         }
     }
 
     class Err_NumArgsError extends Err_FuncError { 
+        static __New() {
+            Err_ErroresPersonalizadosActivo := false
+
+            Vna(n) => n >= 0
+            Vna.Mensaje := "El número de argumentos del error debe ser >= 0"
+            this.Prototype.DefinePropEstandar("NumArgs", IsInteger, Vna, Integer)
+
+            Err_ErroresPersonalizadosActivo := true
+        }
+
         /*
             @method Constructor
 
@@ -665,16 +686,15 @@ if (!IsSet(__ERR_H__)) {
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si el número de argumentos no es un entero >= 0
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ERR_NUM_ARGS"], fecha?, errorPrevio?, funcion?, numArgs?) {
-            if !IsSet(numArgs)
-                numArgs := ""
-            else if !IsInteger(numArgs) 
-                throw TypeError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero")
-            else if (numArgs := Integer(numArgs)) < 0
-                throw ValueError("(" ERR_ERRORES["ERR_VALOR_ARG"] ") El número de argumentos debe ser un entero >= 0")
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["NUM_ARGS"], fecha?, errorPrevio?, funcion?, numArgs?) {
+            super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?, funcion?)
 
-            super.__New(mensaje, what, extra, codigo, fecha, funcion)
-            super._AgregarPropsCadena(Map("numArgs", numArgs), !IsSet(extra))
+            Err_ErroresPersonalizadosActivo := false
+            
+            if IsSet(numArgs)
+                this.NumArgs := numArgs
+
+            Err_ErroresPersonalizadosActivo := true
         }
 
         /*
@@ -682,11 +702,15 @@ if (!IsSet(__ERR_H__)) {
 
             @description Convertir la información de la excepción a una cadena String.
 
-            @param {String} texto - Cadena a añadir al mensaje antes del texto de la propiedad Extra.
-            @param {Boolean} extra - Si true, se añade la información de la propiedad Extra.
+            @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
-        ToString(texto := "", extra := false) {
-            return super.ToString("- NumArgs: " this.numArgs " " texto, extra)
+        ToString(texto?) {
+            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
+
+            try
+                _texto := ". NumArgs: " this.NumArgs
+
+            return super.ToString((_texto ?? "") . texto)
         }
     }
 
@@ -695,6 +719,6 @@ if (!IsSet(__ERR_H__)) {
 
     class Err_ObjetoError extends Err_ErrorNoAHK {
     }
-}   
+   
 
 
