@@ -26,7 +26,7 @@
 if (!IsSet(__ERR_H__)) 
     global __ERR_H__ := true
 
-    /*** VALORES GLOBALES Y CÓDIGOS DE ERRORES ***/
+    /*** VALORES GLOBALES ***/
 
     /*
         @global NULL {String} - En ahk una cadena vacía se usa como null o valor indefinido.
@@ -46,6 +46,7 @@ if (!IsSet(__ERR_H__))
 
 
 
+
     /*** FUNCIONES DE MENSAJE DE ERRORES ***/
 
     /*
@@ -57,6 +58,7 @@ if (!IsSet(__ERR_H__))
         @param {Error} e - Objeto clase Error con la información de la excepción.
     */
     Err_Error.Prototype.DefineProp("MsgBox", {Call: (e) => MsgBox(e)})
+
 
 
 
@@ -93,6 +95,16 @@ if (!IsSet(__ERR_H__))
     }
 
     global Err_EsCadena := _Err_EsCadena
+
+; **** Hacer todas estas funciones y usarlas en todos los DefineProp y VerificarArg. Y acabar los errores después de los cambios.
+
+    Err_Cadena(valor) => String(valor)
+    Err_Cadena.TipoError := Err_FuncArgError
+            S(s) => String(s)
+            S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
+            S.TipoError := Err_FuncArgError
+            EsClase(s) => %String(s)% is Class
+            EsClase.Mensaje := "La cadena tipo de dato no representa ninguna Clase"
 
 
     /*
@@ -144,7 +156,7 @@ if (!IsSet(__ERR_H__))
         ¿Restringir la función a Enumerator en lugar de aceptarla siendo simplemente Llamable (Call)? Un Enumerator es una función que admite 
     */
     _Err_VerificarEnumerable(enum, numArgs) {
-        ; numArgs se verifica en Err_AdmineNumArgs y en __Enum
+        ; numArgs se verifica en AdmiteNumArgs y en __Enum
 
         if enum.HasMethod("__Enum") {
             try 
@@ -180,47 +192,64 @@ if (!IsSet(__ERR_H__))
     /*
         @function Err_VerificarArg_Prv
 
-        @description Verificar un argumento para comprobar si es válido y cumple ciertas condiciones de tipo y valor. Solo comprueba el valor del argumento y no hace ninguna verificación del resto de parámetros, por lo que ESTA FUNCIÓN SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
+        @description Verificar un argumento para comprobar si es válido y cumple ciertas condiciones. Solo comprueba el valor del argumento y no hace ninguna verificación del resto de parámetros, por lo que ESTA FUNCIÓN SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
 
         @param {Object} valorArg - Valor del argumento a comprobar.
         @param {String} nombreArg - Nombre del argumento.
         @param {Integer} posArg - Posición del argumento.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. Si lanza algún error se considera igual que si valorArg no cumpliese el tipo correcto, y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error. Si lanza algún error se considera igual que si valorArg no cumple el valor correcto y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Si lanza algún error se considera un error de    y no como un problema de la función en sí misma (para comprobar la función está Err_VerificarArg)
+        @param {Func} funciones - Funciones de verificación que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento valorArg. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
+        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión de valorArg, y lo que devuelva se usará como nuevo valorArg. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
 
         @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
 
         @throws {Error/Err_TipoArgError} - Si el valorArg no es de tipo correcto.        
-        @throws {Error/Err_ValorArgError} - Si el valorArg no ecumple la validación del valor..
-        @throws {Error/Err_ArgError} - Si el valorArg no puede ser convertido.
+        @throws {Error/Err_ValorArgError} - Si el valorArg no cumple la validación del valor..
+        @throws {Error/Err_FuncArgError} - Si el valorArg no puede ser convertido.
     */
-    _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
-        infoFunciones := Map()
-        if IsSet(comprobarTipo)
-            infoFunciones[comprobarTipo] := {mensaje: "El tipo del valor no cumple", tipoError: Err_TipoArgError, argError: Type(valorArg)}
-        if IsSet(comprobarTipo)
-            infoFunciones[validarValor] := {mensaje: "El valor no cumple la validación de", tipoError: Err_ValorArgError, argError: valorArg}
-
-        for funcion, info in infoFunciones {
-            try
-                esCorrecto := funcion(valorArg) 
-            catch as e
-                esCorrecto := false
-            
-            if !esCorrecto {
-                ; Se usa Err_EsCadena porque no queremos lanzar más excepciones llegados a este punto.
-                mensaje := funcion.HasProp("Mensaje") and Err_EsCadena(funcion.Mensaje) ? String(funcion.Mensaje) : info.mensaje " " funcion.Name
-                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : info.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, info.argError)
+    _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*) {
+        esCorrecto := true
+        argsExtra := []
+        for funcion in funciones {
+            if funcion.TipoError == Err_FuncArgError {
+                try
+                    valorArg := funcion(valorArg)
+                catch as e {
+                    argsExtra.Push(funcion)
+                    try
+                        mensaje := String(funcion.Mensaje)
+                    catch
+                        mensaje := "El valor no se puede convertir con" funcion.Name
+                    
+                    esCorrecto := false
+                }
             }
+            else {
+                try
+                    esCorrecto := funcion(valorArg) 
+                catch as e {
+                    if funcion.TipoError == Err_TipoArgError {
+                        argsExtra.Push(Type(valorArg))
+                        try
+                            mensaje := String(funcion.Mensaje)
+                        catch
+                            mensaje := "El tipo del valor no cumple" funcion.Name
+                    }
+                    else if funcion.TipoError == Err_ValorArgError {
+                        try
+                            mensaje := String(funcion.Mensaje)
+                        catch
+                            mensaje := "El valor no cumple la validación de" funcion.Name
+                    }
+
+                    esCorrecto := false
+                }
+            }
+
+            if !esCorrecto
+                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : funcion.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, argsExtra*)
         }
 
-        try
-            return IsSet(convertirValor) ? convertirValor(valorArg) : valorArg
-        catch as e {
-            mensaje := convertirValor.HasProp("Mensaje") and Err_EsCadena(convertirValor.Mensaje) ? String(convertirValor.Mensaje) : "El valor no se puede convertir con " convertirValor.Name
-            throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_ArgError(mensaje, , , , , e?, nombreArg?, posArg?)
-        }
+        return valorArg
     }
 
     global Err_VerificarArg_Prv := _Err_VerificarArg_Prv
@@ -243,34 +272,27 @@ if (!IsSet(__ERR_H__))
         @throws {TypeError/Err_TipoArgError} - Si algún argumento no es de tipo correcto.        
         @throws {ValueError/Err_ValorArgError} - Si algún argumento no ecumple la validación de valor.
     */
-    _Err_VerificarArg(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?) {
+    _Err_VerificarArg(valorArg, nombreArg?, posArg?, funciones*) {
         ; nombreArg y posArg solo sirven de información a ser incluida en el error lanzado en caso de fallo en la verificación. Ambos ya se comprueban en el único sitio donde se usan: constructor del Error a lanzar si falla la verificación.
 
-        if IsSet(comprobarTipo) {
-            EsFunc(f) => _Err_AdmiteNumArgs(f, 1)
-            EsFunc.Mensaje := "No es una función o no admite un argumento"
-            _Err_VerificarArg_Prv(comprobarTipo, "comprobarTipo", 4, EsFunc)
+        FuncOK(f) => _Err_AdmiteNumArgs(f, 1) and f.HasProp("TipoError") and f.TipoError.HasBase(Err_ArgError)
+        FuncOK.Mensaje := "No es una función, no admite un argumento o no tiene propiedad TipoError con un tipo Err_ArgError"
+        FuncOK.TipoError := Err_TipoArgError
 
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
-        }
-        if IsSet(validarValor) {
-            _Err_VerificarArg_Prv(validarValor, "validarValor", 5, EsFunc)
+        for funcion in funciones {
+            _Err_VerificarArg_Prv(funcion, , 3 + A_Index, FuncOK)
 
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
-        }
-        if IsSet(convertirValor) {
-            _Err_VerificarArg_Prv(convertirValor, "convertirValor", 6, EsFunc)
-
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
+            /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
 
-        return _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, comprobarTipo?, validarValor?, convertirValor?)
+        return _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*)
     }
 
     global Err_VerificarArg := _Err_VerificarArg
 
     
-    
+
+
     /*** EXCEPCIONES PERSONALIZADAS ***/
 
     /*
@@ -316,24 +338,28 @@ if (!IsSet(__ERR_H__))
         
             /* Se añaden las propiedades nuevas al prototipo de Err_Error */
 
-            Sm(s) => String(s)
-            Sm.Mensaje := "El mensaje debe ser una cadena o convertible a cadena"
-            this.Prototype.DefinePropEstandar("Message", , , Sm)
+            S(s) => String(s)
+            S.Mensaje := "Debes pasar una cadena o un valor convertible a cadena"
+            S.TipoError := Err_FuncArgError
+            this.Prototype.DefinePropEstandar("Message", S)
             ;this.Prototype.DefinePropEstandar("What", Es_String, , String, true) ; Mejor dejar What como está porque no se sabe muy bien qué formato admite
-            Se(s) => String(s)
-            Se.Mensaje := "Extra debe ser una cadena o convertible a cadena"
-            this.Prototype.DefinePropEstandar("Extra", , , Se)
+            this.Prototype.DefinePropEstandar("Extra", S)
 
+            Entero(i) => Integer(i)
+            Entero.TipoError := Err_FuncArgError
             ValidarCodigo(c) => this.ERRORES.ContieneValor(c)
             ValidarCodigo.Mensaje := "El código de error no está incluido en la lista de códigos"
-            this.Prototype.DefinePropEstandar("Codigo", IsInteger, ValidarCodigo, Integer)
+            ValidarCodigo.TipoError := Err_ValorArgError
+            this.Prototype.DefinePropEstandar("Codigo", Entero, ValidarCodigo)
 
             ValidarFecha(f) => FormatTime(f) != ""
             ValidarFecha.Mensaje := "La fecha no está en un formato válido YYYYMMDDHH24MISS"
-            this.Prototype.DefinePropEstandar("Fecha", , ValidarFecha, String)
+            ValidarFecha.TipoError := Err_ValorArgError
+            this.Prototype.DefinePropEstandar("Fecha", ValidarFecha, S)
 
             ComprobarError(e) => e is Error
             ComprobarError.Mensaje := "La excepción previa tiene que ser tipo Error"
+            ComprobarError.TipoError := Err_TipoArgError
             this.Prototype.DefinePropEstandar("ErrorPrevio", ComprobarError)
 
             Err_ErroresPersonalizadosActivo := true
@@ -426,6 +452,7 @@ if (!IsSet(__ERR_H__))
 
             ComprobarTipo(e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK)
             ComprobarTipo.Mensaje := "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"
+            ComprobarTipo.TipoError := Err_TipoArgError
             tipoErrorAHK := Err_VerificarArg_Prv(this, "this", 0, ComprobarTipo)
 
             excepcion := tipoErrorAHK(mensaje?, what, extra?)
@@ -458,13 +485,19 @@ if (!IsSet(__ERR_H__))
         static __New() {
             Err_ErroresPersonalizadosActivo := false
 
-            VP(i) => Integer(i) >= 0
+            VP(i) => i >= 0
             VP.Mensaje := "La posición del argumento debe ser entero >= 0 (0 para this)"
-            this.Prototype.DefinePropEstandar("PosArg", Es_Entero(i) => IsInteger(i), VP, Integer)
+            VP.TipoError := Err_ValorArgError
+            Entero(i) => Integer(i)
+            Entero.TipoError := Err_FuncArgError
+            this.Prototype.DefinePropEstandar("PosArg", Entero, VP)
 
             S(s) => String(s)
             S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
-            this.Prototype.DefinePropEstandar("NombreArg", , , S)
+            S.TipoError := Err_FuncArgError
+            this.Prototype.DefinePropEstandar("NombreArg", S)
+
+            this.Prototype.DefinePropEstandar("ValorArg")
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -480,11 +513,12 @@ if (!IsSet(__ERR_H__))
             @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
+            @param {Object} ValorArg - Valor del argumento involucrado en el error. Si no está definido, la propiedad ValorArg queda indefinida; si está definido se la guarda el valor.
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["ARG"], fecha?, errorPrevio?, nombreArg?, posArg?) {
+        __New(mensaje, what?, extra?, codigo := Err_Error.ERRORES["ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
             super.__New(mensaje, what, extra, codigo, fecha)
 
             Err_ErroresPersonalizadosActivo := false
@@ -493,6 +527,8 @@ if (!IsSet(__ERR_H__))
                 this.NombreArg := nombreArg
             if IsSet(posArg)
                 this.PosArg := posArg
+            if IsSet(posArg)
+                this.ValorArg := valorArg
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -506,12 +542,28 @@ if (!IsSet(__ERR_H__))
         */
         ToString(texto?) {
             texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
-            try
-                _texto := ". NombreArg: " this.NombreArg
-            try
-                _texto .= ". #Arg: " this.PosArg
 
-            return super.ToString((_texto ?? "") . texto)
+            _texto := ". NombreArg: "
+            try
+                _texto .= this.NombreArg
+            catch 
+                _texto.= "<Sin nombre>"
+
+            _texto .= ". #Arg: "
+            try
+                _texto .= this.PosArg
+            catch
+                _texto .= "<Sin posición"
+
+            _texto .= ". ValorArg: "
+            try
+                texto .= String(this.ValorArg)
+            catch PropertyError
+                texto .= " <Sin valor>"
+            catch
+                texto .= " <No imprimible>"
+
+            return super.ToString(_texto . texto)
         }
     }
 
@@ -519,9 +571,12 @@ if (!IsSet(__ERR_H__))
         static __New() {
             Err_ErroresPersonalizadosActivo := false
 
+            S(s) => String(s)
+            S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
+            S.TipoError := Err_FuncArgError
             EsClase(s) => %String(s)% is Class
             EsClase.Mensaje := "La cadena tipo de dato no representa ninguna Clase"
-            this.Prototype.DefinePropEstandar("TipoArg", , EsClase, String)
+            this.Prototype.DefinePropEstandar("TipoArg", Err_Cadena, Err_Clase)
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -542,8 +597,8 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["TIPO_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, tipoArg?) {
-            super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
+        __New(mensaje, what?, extra?, codigo := Err_Error.ERRORES["TIPO_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?, tipoArg?) {
+            super.__New(mensaje, what?, extra?, codigo, fecha?, nombreArg?, posArg?, valorArg?)
             Err_ErroresPersonalizadosActivo := false
             if IsSet(tipoArg)
                 this.TipoArg := tipoArg
@@ -569,7 +624,6 @@ if (!IsSet(__ERR_H__))
     class Err_ValorArgError extends Err_ArgError {
         static __New() {
             Err_ErroresPersonalizadosActivo := false
-            this.Prototype.DefinePropEstandar("ValorArg")
             Err_ErroresPersonalizadosActivo := true
         }
 
@@ -584,7 +638,6 @@ if (!IsSet(__ERR_H__))
             @param {Error} errorPrevio - Error previo que lanzó el sistema como causa del problema.
             @param {String} nombreArg - Nombre del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios. Se guarda como nueva propiedad NombreArg
             @param {String} posArg - Número de posición del argumento que ha generado el error. Si son varios posibles argumentos, separarlos por espacios en orden respecto a los nombres. Se guarda como nueva propiedad PosArg
-            @param {Any} ValorArg - Valor del argumento que genera el error. Si no está definido, la propiedad ValorArg queda indefinida; si está definido se la guarda el valor. Se puede pasar una lista de valores en caso de haber varios, aunque internamente no considera si son varios o un solo valor lista. Simplemente.
 
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
@@ -603,11 +656,7 @@ if (!IsSet(__ERR_H__))
             @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
-            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
-            try
-                _texto := ". ValorArg: " Err_EsCadena(this.ValorArg) ? String(this.ValorArg) : " <No imprimible> "
-
-            return super.ToString((_texto ?? "") . texto)
+            return super.ToString(texto)
         }
     }
 

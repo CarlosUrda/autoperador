@@ -11,8 +11,11 @@
         - Hace un módulo de testing por cada librería, donde se pruebe cada función.
 
         Pasos:
-        - Funciones definir propiedades genérica
-        - Acabar los errores personalizados.
+        - Modificar los Err_ArgError con la nueva modificación.
+        - Revisar todas las llamadas a DefinePropEstandar y VerificarArg
+        - Terminar Eliminar duplicados y usarlo en MapOrdenado
+        - Probar si se puede hacer unset con Set para eliminar la función de comparación.
+        - Tener en cuenta que si hay función de comparación en MapOrden no hace falta preocuparse si meter los valores en orden.
         - Adaptar Util y error a los errores personalizados.
         - Funcion MergeSort, MapORdenado y  MapPrioridades.
         - Probar debug.
@@ -29,15 +32,15 @@
 /* En lugar del include se llamaría (dentro de Util??) a la función del módulo para ejecutarla, y solo se ejecutaría en teoría una vez si está en la librería */
 #Include "error.ahk"
 
-;if (!IsSet(__UTIL_H__)) {
-;    global __UTIL_H__ := true
+if (!IsSet(__UTIL_H__)) {
+    global __UTIL_H__ := true
 
-Util() {
+/* Util() {
     static ejecutado := false
     if ejecutado
         return
     ejecutado := true
-
+ */
     /*
         @function Util_Clase
 
@@ -63,58 +66,13 @@ Util() {
 
 
     /*
-        @function Util_EsBase_Prv
-
-        @description Saber si un objeto clase es ancestro (se hereda de él). Esta función no verifica los argumentos, por lo que SOLO DEBE SER USADA INTERNAMENTE POR MOTIVOS DE SEGURIDAD.
-
-        @param {Class} clase - Clase a partir de la cual comprobar si otra clase es ancestro.
-        @param {Class} ancestro - Clase a comprobar si es ancestro de clase.
-
-        @returns {Boolean} - Devuelve true o false si es ancestro o no.
-    */
-    _Util_EsBase_Prv(clase, baseRaiz) {
-        if clase == baseRaiz or baseRaiz.Base == clase
-            return false
-
-        while (clase := clase.Base) != baseRaiz
-            if clase == Any
-                return false
-
-        return true
-    }
-
-    /*
-        @function Util_EsBase
-
-        @description Saber si un objeto clase es ancestro (se hereda de él).
-
-        @param {Class} clase - Clase a partir de la cual comprobar si otra clase es ancestro.
-        @param {Class} baseRaiz - Clase a comprobar si es ancestro de clase.
-
-        @returns {Boolean} - Devuelve true o false si es ancestro o no.        
-    */
-    _Util_EsBaseM(clase, baseRaiz) {
-        Err_VerificarArg_Prv(baseRaiz, "baseRaiz", 2, Es_Clase(o) => o is Class)
-        return _Util_EsBase_Prv(clase, baseRaiz)
-    }
-
-    _Util_EsBase(clase, baseRaiz) {
-        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)
-        return clase.EsAncestro(baseRaiz)
-    }
-
-    Class.Prototype.DefineProp("EsBase", {Call: _Util_EsBaseM})
-    global Util_EsBase := _Util_EsBase
-
-
-    /*
         @function Util_EsDescendiente
 
         @description Saber si un objeto clase es descendiente o heredero.
     */
     _Util_EsDescendienteM(clase, descendiente) {
         Err_VerificarArg_Prv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
-        return _Util_EsBase_Prv(descendiente, clase)
+        return descendiente.HasBase(clase)
     }
 
     _Util_EsDescendiente(clase, descendiente) {
@@ -235,18 +193,17 @@ Util() {
 
         @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super. Versión Prv PARA SOLO USO INTERNO. YA QUE NO COMPRUEBA NINGUNO DE LOS ARGUMENTOS.
         - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
-        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no puede grabar el valor internamente lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación; Err_ArgError si no se puede convertir.
+        - Set guardará el valor, aplicando previamente las funciones de verificación.
 
         @param {String} prop - Nombre de la propiedad.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación.
+        @param {Func} funciones - Funciones de verificación usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
+        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión del valor recibido, y lo que devuelva se usará como nuevo valor obtenido. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
 
         @throws {MethodError} - Si existe algún error al definir la propiedad con DefineProp.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
-    _Util_DefinePropEstandar_Prv(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
+    _Util_DefinePropEstandar_Prv(obj, prop, funciones*) {
         _Get(_obj) {
             try 
                 return _obj.%"_" prop%
@@ -255,7 +212,7 @@ Util() {
         }
 
         _Set(_obj, valor) {
-            valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, comprobarTipo?, validarValor?, convertirValor?)
+            valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, funciones*)
 
             try 
                 return (_obj.%"_" prop% := valorVerficado)
@@ -276,45 +233,39 @@ Util() {
         @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super.
 
         - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
-        - Set guardará el valor, previamente comprobado el tipo y el valor, convirtíendolo a otro valor. Si no puede grabar el valor internamente lanzaŕa PropertyError. Además, lanza TypeError/Err_TipoArgError si el valor no es el tipo correcto; ValueError/Err_ValorError si el valor no pasa validación; Err_ArgError si no se puede convertir.
+        - Set guardará el valor, aplicando previamente las funciones de verificación.
 
         @param {String} prop - Nombre de la propiedad.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación.
-
-        @throws {TypeError/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
+        @param {Func} funciones - Funciones de verificación usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
+        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión del valor recibido, y lo que devuelva se usará como nuevo valor obtenido. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
+        
+        @throws {Error/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
-        _Util_DefinePropEstandarM(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
+    _Util_DefinePropEstandarM(obj, prop, funciones*) {
         prop := Err_VerificarArg_Prv(prop, "prop", 2, , , String)
-        if IsSet(comprobarTipo) {
-            EsFunc(f) => Err_AdmiteNumArgs(f, 1)
-            EsFunc.Mensaje := "No es una función o no admite un argumento"
-            Err_VerificarArg_Prv(comprobarTipo, "comprobarTipo", 3, EsFunc)
-            
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el tipo de un valor sin lanzar excepciones */
-        }
-        if IsSet(validarValor) {
-            Err_VerificarArg_Prv(validarValor, "validarValor", 4, EsFunc)
-            
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo comprueba el valor suponiendo que el tipo ha sido ya comprobado anteriormente, sin lanzar excepciones */
-        }
-        if IsSet(convertirValor) {
-            Err_VerificarArg_Prv(convertirValor, "convertirValor", 5, EsFunc)
-            
-            /* Aquí se verificaría la función para comprobar que no es maliciosa y que realmente solo convierte el valor, sin lanzar excepciones, suponiendo que el tipo y el valor han sido comprobados anteriormente */
+
+        FuncOK(f) => _Err_AdmiteNumArgs(f, 1) and f.HasProp("TipoError") and f.TipoError.HasBase(Err_ArgError)
+        FuncOK.Mensaje := "No es una función, no admite un argumento o no tiene propiedad TipoError con un tipo Err_ArgError"
+        FuncOK.TipoError := Err_TipoArgError
+
+        for funcion in funciones {
+            Err_VerificarArg_Prv(funcion, , 2 + A_Index, FuncOK)
+
+            /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
 
-        return  _Util_DefinePropEstandar_Prv(obj, prop, comprobarTipo?, validarValor?, convertirValor?)
+        return  _Util_DefinePropEstandar_Prv(obj, prop, funciones*)
     }
 
-    _Util_DefinePropEstandar(obj, prop, comprobarTipo?, validarValor?, convertirValor?) {
-        if !(obj is Object)
-            throw Err_TipoArgError("Debes pasar un Object para definir la nueva propiedad", , , , , , "obj", 1, Type(obj))
+    _Util_DefinePropEstandar(obj, prop, funciones*) {
+        ObjOK(o) => o is Object
+        ObjOK.Mensaje := "Debes pasar un Object para definir la nueva propiedad"
+        ObjOK.TipoError := Err_TipoArgError
+        Err_VerificarArg_Prv(obj, "obj", 1, ObjOK)
 
-        return obj.DefinePropEstandar(prop, comprobarTipo, validarValor, convertirValor)
+        return obj.DefinePropEstandar(prop, funciones*)
     }
 
     ; Se añade como método a Object
@@ -323,216 +274,167 @@ Util() {
 
         
     /*
-        @function Util_AmpliarArgs
+        @function Util_FiltrarArgs
 
-        @description Envolver a una función en otra para recibir más argumentos de los que realmente admite, de los cuales solo se elegirán los deseados que se pasarán en orden a la función real. 
+        @description Envolver a una función en otra que será la que reciba los argumentos para ser filtrados; aquellos que pasen el filtro se pasarán en orden a la primera función. 
 
-        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la función envoltorio. Si es true, el argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
+        @param {Func} funcion - Función a ser envuelta y que recibirá en orden los argumentos que pasan el filtro.
+        @param {Func} filtro - Función que recibirá como argumentos la posición y el valor de cada argumento de la función envoltorio. Si devuelve true, el argumento se pasará a la función; si devuelve false, se desecha. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
 
         @throws {TypeError} - Si los tipos de los argumentos son erróneos.
-        @throws {ErrorNumArgumentos} - (Lanzado por la función resultante envoltorio) Si el número de flags es mayor que el número de argumentos recibidos.
+        @throws {ErrorNumArgumentos} - Si la función no admite el número de argumentos pasados tras el filtro..
 
-        @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
+        @returns {Func} - Función envoltorio que será la que reciba los argumentos a ser filtrados.
     */
-    _Util_AmpliarArgsM(funcion, filtro) {
-        _Funcion(args*) {
-            if args.Length < flagArgs.Length
-                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes para ser filtrados", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+    _Util_FiltrarArgsM(funcion, filtro) {
+        Ff(f) => Err_AdmiteNumArgs(f, 2)
+        Ff.Mensaje := "No es una función o no admite 2 argumentos pos, valor"
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
 
-            _args := []
-            for flag in flagArgs
-                if flag {
-                    _args.Length++
-                    if args.Has(A_Index)
-                        _args[-1] := args[A_Index]
-                }
+        _Funcion(args*) {            
+            _args := args
+            for arg in args
+                try
+                    if !filtro(A_index, arg?)
+                        _args.RemoveAt(A_Index)
+                catch as e
+                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
 
-            if !funcion.AdmiteNumArgs(_args.Length)
-                Err_Lanzar(ErrorNumArgumentos, "La función no admite ", _args.Length " argumentos" ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
-
-            return funcion(_args*)
+            try 
+                return funcion(_args*)
+            catch as e
+                throw Err_NumArgsError("Número de argumentos erróneos", , , , , e, funcion, _args.Length)
         }
 
         return _Funcion
     }
 
-    _Util_AmpliarArgs(funcion, filtro) {
-        if !(funcion is Func)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+    _Util_FiltrarArgs(funcion, filtro) {
+        Err_VerificarArg_Prv(funcion, "funcion", 1, EsFunc(f) => f is Func)
 
-        return _Util_AmpliarArgsM(funcion, filtro)
+        return _Util_FiltrarArgsM(funcion, filtro)
     }
 
     ; Se añade como método a Map, Array y Enumerator
-    Func.Prototype.DefineProp("AmpliarArgs", {Call: _Util_AmpliarArgsM})
-    global Util_AmpliarArgs := _Util_AmpliarArgs
+    Func.Prototype.DefineProp("FiltrarArgs", {Call: _Util_FiltrarArgsM})
+    global Util_FiltrarArgs := _Util_FiltrarArgs
 
 
-    /*
-        @function Util_AmpliarArgs
-
-        @description Envolver a una función para que reciba llamadas con menos argumentos de los que realmente admite, eligiendo la posición en orden donde irán en la llamada a la función real. 
-
-        @param {Array} flagArgs - Array de Boolean, uno por cada argumento en orden que recibirá la llamada a la función real. Si es true, ese argumento se pasará a la función real; si es false, ese argumento no se pasará. El número de elementos debe ser igual o mayor al número de argumentos que se pasará a la función envoltorio. Los argumentos no considerados por flagArgs serán ignorados.
-
-        @returns {Func} - Función envoltorio que podrá recibir los argumentos ampliados.
-    */
-    Util_ReducirArgs(funcion, flagArgs*) {
-        if !Err_EsFuncion(funcion)
-            Err_Lanzar(TypeError, "El argumento filtro no es un Func", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        if !(flagArgs is Array) or flagArgs.Length == 0
-            Err_Lanzar(TypeError, "Debes pasar un Array no vacío de valores Boolean", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-
-        _Funcion(args*) {
-            if args.Length < flagArgs.Length
-                Err_Lanzar(ErrorNumArgumentos, "Número de argumentos insuficientes", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
-
-            _args := []
-            for flag in flagArgs
-                if flag {
-                    _args.Length++
-                    if args.Has(A_Index)
-                        _args[-1] := args[A_Index]
-                }
-
-            return funcion(_args*)
-        }
-
-        return _Funcion
-    }
-
-        
 
     /*
         @function Util_SubLista
 
-        @description Obtener una sublista formada con los elementos de una lista (índices enumerados a partir de 1) que cumplan la condición de la funcion filtro. La lista debe ser un Array en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Array al iterar sobre ella (si solo se itera sobre un argumento, obtener cada valor y no el índice).
+        @description Modificar un array obteniendo una sublista formada con los elementos (índices reenumerados a partir de 1) que cumplan la condición de la funcion filtro.
 
-        @param {Array} lista - Lista de la cual obtener la sublista
-        @param {Func} filtro - Función condición que recibirá el índice y valor de cada elemento. Devolverá true o false si cumple o no la condición. 
-        @param {Boolean} modificar - Si true modifica la lista pasada como argumento dejándola como la sublista. Si false, deja la lista original intacta.
+        @param {Array} lista - Lista a ser modifcada.
+        @param {Func} filtro - Función condición que recibirá el índice y valor de cada elemento. Devolverá true o false si cumple o no la condición. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
 
-        @returns {Array} - Sublista con los valores obtenidos. Si modificar es true devuelve la misma lista pasada por argumento modificada. Si es false, devuelve una nueva lista.
-
-        @throws {TypeError} - Si los tipos de los argumentos no son correctos.
-        @throws {ErrorEnumerator} - Si lista no puede generar un Enumerator correcto a ser recorrido.
-        @throws {ErrorFuncion} - Si filtro genera algún error al ser ejecutado.
-        @throws {Error} - Si ocurre algún otro error.
+        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_FuncError} - Si filtro genera algún error al ser ejecutado.
 
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    Util_SubLista(lista, filtro, modificar := false) {
-        try
-            admiteNumArgs := Err_AdmiteNumArgs(filtro, 2)
-        catch TypeError as e
-            Err_Lanzar(e, "Argumento filtro no es una función válida")
-        else if !admiteNumArgs
-            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos índice y valor", ERR_ERRORES["ERR_NUM_ARGS"])
+    _Util_SubListaM(lista, filtro) {
+        Ff(f) => Err_AdmiteNumArgs(f, 2)
+        Ff.Mensaje := "No es una función o no admite 2 argumentos índice, valor"
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
 
-        if modificar {
-            if !(lista is Array)
-                Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-            
-            try
-                _enum := Err_VerificarEnumerator(lista.Clone(), 2)
-            catch as e {
-                e := e.Clonar(ErrorEnumerator)
-                Err_Lanzar(e, "La lista no se admite como un Enumerator válido")                
-            }
-
-            removidos := 0
-            for i, valor in _enum 
-                try 
-                    if !filtro(i, valor) {
-                        lista.RemoveAt(i-removidos)
-                        removidos++
-                    }
-                catch as e {
-                    e := e.Clonar(ErrorFuncio)
-                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
-                }
-        }
-        else {
-            try
-                _enum := Err_VerificarEnumerator(lista, 1)
+        enum := Err_VerificarEnumerable(lista.Clone(), 2)
+        removidos := 0
+        for i, valor in enum
+            try 
+                if !filtro(i, valor?)
+                    lista.RemoveAt(i-(removidos++))
             catch as e
-                Err_Lanzar(e, "Argumento lista no se admite como un Enumerator válido")
-            
-            lista := Array()
-
-            ; Usando A_Index evitamos el problema de un Enumerator con un solo argumento
-            for valor in _enum
-                try
-                    if filtro(A_Index, valor)
-                        lista.Push(valor)
-                catch as e
-                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
-        }
-
-        return lista
+                throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+        catch as e 
+            throw Err_FuncError("Fallo al recorrer el enumerable de la lista", , , , , e, enum)    
     }
+    
+    ; Se añade como método a Array
+    Array.Prototype.DefineProp("SubLista", {Call: _Util_SubListaM})
 
 
 
     /*
-        @function Util_SubMap
+        @function Util_SubDicc
 
-        @description Obtener un submap formado con los elementos de un diccionario que cumplan la condición de la funcion filtro. La lista debe ser un Map en caso de ser modificada. Si no va a ser modificada, la lista debe comportarse como un Map al iterar sobre ella, considerando clave y valor.
+        @description Modificar un map obteniendo un subdiccionario formado con los elementos (clave, valor) que cumplan la condición de la funcion filtro.
 
-        @param {Map} dicc - Map de la cual obtener el diccionario.
-        @param {Func} filtro - Función condición que recibirá la clave y valor de cada elemento. Devolverá true o false si cumple o no la condición. 
-        @param {Boolean} modificar - Si true modifica el diccionario pasado como argumento dejándolo como el submap. Si false, deja el map original intacto.
+        @param {Map} dicc - Diccionario a ser modificado.
+        @param {Func} filtro - Función condición que recibirá la clave y valor de cada elemento. Devolverá true o false si cumple o no la condición.
 
-        @returns {Map} - Submap con los valores obtenidos. Si modificar es true devuelve el mismo map pasado por argumento modificado. Si es false, devuelve un nuevo map.
+        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_FuncError} - Si filtro genera algún error al ser ejecutado.
 
-        @throws {TypeError} - Si los tipos de los argumentos no son correctos.
-        @throws {Error} - Si ocurre algún otro error.
-
-        @todo Cuando se filtra por clave al modificar el diccionario, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa clave inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
+        @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    Util_SubMap(dicc, filtro, modificar := false) {
-        try
-            admiteNumArgs := Err_AdmiteNumArgs(filtro, 2)
-        catch TypeError as e
-            Err_Lanzar(e, "Argumento filtro no es una función válida")
-        else if !admiteNumArgs
-            Err_Lanzar(TypeError, "Argumento filtro no admite argumentos clave y valor")
- 
-        if modificar {
-            if !(dicc is Map)
-                Err_Lanzar(TypeError, "El argumento dicc no es un Map", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-            
-            try
-                _enum := Err_VerificarEnumerator(dicc.Clone(), 2)
-            catch as e
-                Err_Lanzar(e, "El diccionario no puede ser usado como un Enumerator válido")
+    _Util_SubDiccM(dicc, filtro) {
+        Ff(f) => Err_AdmiteNumArgs(f, 2)
+        Ff.Mensaje := "No es una función o no admite 2 argumentos clave, valor"
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
 
-            for clave, valor in _enum 
-                try
+        enum := Err_VerificarEnumerable(dicc.Clone(), 2)
+        try
+            for clave, valor in enum
+                try 
                     if !filtro(clave, valor)
                         dicc.Delete(clave)
                 catch as e
-                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
-        }
-        else {          
-            try
-                _enum := Err_VerificarEnumerator(dicc, 2)
-            catch as e
-                Err_Lanzar(e, "El diccionario no puede ser usado como un Enumerator válido")
-
-            dicc := Map()
-
-            for clave, valor in _enum
-                try
-                    if filtro(clave, valor)
-                        dicc[clave] := valor
-                catch as e
-                    Err_Lanzar(e, "Error en la función filtro: " e.Message, ERR_ERRORES["ERR_FUNCION"], A_LineNumber)                            
-        }
-
-        return dicc
+                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+        catch as e 
+            throw Err_FuncError("Fallo al recorrer el enumerable del diccionario", , , , , e, enum)
+    
     }
+    
+    ; Se añade como método a Map
+    Map.Prototype.DefineProp("SubDicc", {Call: _Util_SubDiccM})
+
         
+    /*
+        @function Util_SubEnumerable
+
+        @description Obtener un array con los elementos de un enumerable que pasan un filtro. Si el enumerable admite varios argumentos, cada elemento dentro de la lista resultante será un array con los valores de cada elemento del enumerable.
+
+        @param {Object<__Enum>|Enumerator} enum - Lista de la cual obtener la sublista
+        @param {Integer} numArgs - Número de argumentos que admitirá el enumerable.
+        @param {Func} filtro - Función condición que recibirá como argumentos todos los valores de cada elemento del enumerable. Devolverá true o false si cumple o no la condición. tener en cuenta que puede recibir valores no definidos.
+
+        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_FuncError} - Si filtro genera algún error al ser ejecutado.
+
+        @return {Array} - Lista de elementos del enumerable que han pasado un filtro. Si cada elemento está formado por varios valores (tantos como numArgs), devuelve un array de arrays.
+    */
+    Util_SubEnumerable(enum, numArgs, filtro) {
+        Ff(f) => Err_AdmiteNumArgs(f, numArgs)
+        Ff.Mensaje := "No es una función o no admite numArgs"
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
+
+        enum := Err_VerificarEnumerable(enum, numArgs)
+
+        resultado := Array()
+        valoresRef := Array()
+        Loop numArgs
+            valoresRef.Push(Util_CrearVarRef())
+
+        try
+            while enum(valoresRef*) {
+                valores := Array()
+                for valorRef in valoresRef
+                    valores.Push(%valorRef%?)
+
+                try
+                    if filtro(valores*)
+                        resultado.Push(Array(valores*))
+                catch as e
+                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+            }
+        catch as e 
+            throw Err_FuncError("Fallo al recorrer el enumerable", , , , , e, enum)
+
+        return resultado
+    }
+    
 
     /*
         @function Util_EnumerableACadena
@@ -545,14 +447,12 @@ Util() {
         @param {String} sepPartes - cadena para separar cada uno de los valores obtenidos en una llamada al enumerable. Separador entre elementos de una entrada. Si numArgs == 1 se ignora.
 
         @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
-        @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
+        @throws {Err_FuncError} - Si hay fallo al recorrer el enumerable.
 
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
     _Util_EnumerableACadenaM(enum, numArgs := 1, sepGrupo := ";", sepPartes := ":") {
-        Ve(e) => Err_VerificarEnumerable(e, numArgs)
-        Ve.Mensaje := "Enumerable no válido: número de argumentos incompatible o tipo de objeto incorrecto"
-        enum := Err_VerificarArg_Prv(enum, "enum", 1, , , Ve)
+        enum := Err_VerificarEnumerable(e, numArgs)
         S(s) => String(s)
         S.Mensaje := "Los separadores deben de ser una cadena",
         sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, , , S)
@@ -563,81 +463,240 @@ Util() {
             valoresRef.Push(Util_CrearVarRef())
 
         cadena := ""
-        while enum(valoresRef*) {
-            for valorRef in valoresRef
-                cadena .= (%valorRef% ?? "") sepPartes " "
+        try
+            while enum(valoresRef*) {
+                for valorRef in valoresRef
+                    cadena .= (%valorRef% ?? "") sepPartes " "
 
-            cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
-        }
+                cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
+            }
+        catch as e 
+            throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)
 
         return RTrim(cadena, sepGrupo " ")
     }
-
-    _Util_EnumerableACadena(enum, numArgs, sepGrupo := ";", sepPartes := ":") {
-        Err_VerificarEnumerable(enum, numArgs)
-        enum.ToString(enum, numArgs, sepGrupo, sepPartes)
-    }
-    
+  
     ; Se añade como método a Map, Array y Enumerator
     Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
     Map.Prototype.DefineProp("ToString", {Call: (m, n?, sg?, sp?) => _Util_EnumerableACadenaM(m, n ?? 2, sg?, sp?)})
-    global Util_EnumerableACadena := _Util_EnumerableACadena
+    global Util_EnumerableACadena := _Util_EnumerableACadenaM
   
 
     /*
         @function Util_ObtenerClaves
         
-        @description Obtener las claves o índices de un objeto enumerable <__Enum> o Enumerator asociadas con valores definidos. Si se pasa un valor, obtiene las claves asociadas con ese único valor. Clave (1º argumento) y Valor (2º argumento) del enumerable.
+        @description Obtener la lista formada por el primer valor de cada uno de los elementos de un enumerable. En caso de Array se obtiene lista de índices, y en caso de Map se obtiene lista de claves. Si se pasan valores, los primeros valores obtenidos son los de aquellos elementos cuyo resto de valores coincide con los valores pasados en orden; en cuanto se pasan valores, solo pasan el filtro aquellos elementos que cumplen esta condición. Si no se pasan valores, se obtienen los primeros valores de aquellos elementos que tienen entre el resto de valores algún valor definido.
 
-        @param {*} valor - valor a obtener sus claves. Si no se pasa se obtienen todas las claves que tengan algún valor definido.
-        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener las claves.
+        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener los primeros valores.
+        @param {Integer} numArgs - Número de argumentos que admitirá el enumerable por cada elemento.
+        @param {Object} valores - Valores a ser comparados con los de cada elemento del enumerable. El número de valores, si se pasan, debe ser igual a numArgs-1.
 
         @throws {TypeError} - Si el tipos del argumentos no es correcto.
         @throws {¿Error?} - Si la función enumerable no admite dos argumentos clave-valor.
 
         @returns {Array} - Array de claves obtenidas
     */
-    _Util_ObtenerClaves(enum, valor?) {
-        claves := []
-        try {
-            if (IsSet(valor)) {
-                for clave, _valor in enum 
-                    if IsSet(_valor) and (_valor == valor)
+    _Util_ObtenerClaves(enum, numArgs := 2, valores*) {
+        enum := Err_VerificarEnumerable(e, numArgs)
+        if numArgs == 0 ; Si el enum admite 0 args, no hace falta hacer más. No hay error.
+            return []
+
+        valoresRef := Array()
+        Loop numArgs-1
+            valoresRef.Push(Util_CrearVarRef())
+        clave := NULL
+        claves := Array()
+
+        if IsSet(valores) {
+            Vv(v) => v.Length == numArgs-1
+            Vv.Mensaje := "El número de valores debe ser igual al numArgs-1 del enumerable"
+            enum := Err_VerificarArg_Prv(valores, "valores", 3, , , Vv)
+
+            try
+                while enum(&clave, valoresRef*) {
+                    claveOK := true
+                    for valorRef in valoresRef
+                        if !(!IsSet(%valorRef%) and !IsSet(valores[A_Index]) or (IsSet(%valorRef%) and IsSet(valores[A_Index]) and valores[A_Index] == %valorRef%)) {
+                            claveOK := false
+                            break
+                        }
+                    
+                    if claveOK
                         claves.Push(clave)
-            }
-            else {
-                for clave, _valor in enum
-                    if IsSet(_valor)
-                        claves.Push(clave)
-            }
+                }
+            catch as e 
+                throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)    
         }
-        catch TypeError as e
-            Err_Lanzar(e, "El argumento enum debe ser Enumerator o tener función __Enum y que ésta devuelva un Enumerator", ERR_ERRORES["ERR_ARG"], A_LineNumber)
-        catch as e
-            Err_Lanzar(e, "El enumerator de enum no admite dos parámetros clave-valor", ERR_ERRORES["ERR_NUM_ARGS"], A_LineNumber)
+        else {
+            try                 
+                while enum(&clave, valoresRef*) {
+                    claveOK := false
+                    for valorRef in valoresRef
+                        if IsSet(%valorRef%) {
+                            claveOK := true
+                            break
+                        }
+                    
+                    if claveOK
+                        claves.Push(clave)
+                }
+            catch as e 
+                throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)    
+        }
 
         return claves
     }
 
     ; Se añade como método a Map y Array
-    Map.Prototype.DefineProp("Claves", {Call: _Util_ObtenerClaves})
-    Array.Prototype.DefineProp("IndicesConValor", {Call: _Util_ObtenerClaves})
+    Map.Prototype.DefineProp("Claves", {Call: (m, v*) => _Util_ObtenerClaves(m, 2, v*)})
+    Array.Prototype.DefineProp("IndicesConValor", {Call: (a, v*) => _Util_ObtenerClaves(a, 2, v*)})
+    Enumerator.Prototype.DefineProp("Claves", {Call: _Util_ObtenerClaves})
     global Util_ObtenerClaves := _Util_ObtenerClaves
 
 
     /*
-        @function Util_OrdenarArray
+        @function _Util_Combinar_Prv
+
+        @description Ordenar la combinación dos sublistas seguidas dentro de una lista como parte del algoritmo MergeSort (_Util_OrdenarListaM). Las dos sublistas tienen que estar ordenadas por separado y ser contiguas.
+
+        @param {Array} lista - Contiene las dos sublistas contiguas. Queda modificada tras la ordenación.
+        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0.
+        @param {Integer} inicio - Indice del primero elemento de la primera sublista
+        @param {Integer} medio - Indice del último elemento de la primera sublista. Medio+1 es el índice del primer elemento de la segunda sublista.
+        @param {Integer} fin - Indice del último elemento de la segunda sublista.
     */
-    _Util_OrdenarArray(lista, comparar, asc := true, modificar := false) {
-        if !(lista is Array)        
-            Err_Lanzar(TypeError, "El argumento lista no es un Array", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+    _Util_Combinar_Prv(lista, comparar, inicio, medio, fin) {
+        indiceIzq := inicio
+        indiceDcha := medio + 1
 
-        if lista.Length <= 1
-            return modificar ? lista : lista.Clone()
-
-
+        while (indiceIzq <= medio and indiceDcha <= fin) {
+            if comparar(lista[indiceIzq], lista[indiceDcha]) > 0 {
+                valor := lista[indiceDcha]
+                lista.RemoveAt(indiceDcha)
+                lista.InsertAt(indiceIzq)
+                indiceDcha++
+                medio++
+            }
+            indiceIzq++
+        }
     }
+
+    /*
+        @function Util_OrdenarListaM
+
+        @description Ordenar una sublista dentro de una lista. La lista queda modificada, pero solo las posiciones de los elementos de la sublista.
+
+        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0.
+        @param {Integer} inicio - Posición del primer elemento de la sublista.
+        @param {Integer} fin - Posición del último elemento de la sublista.
+    */
+    _Util_OrdenarListaM(lista, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
+        Vi(i) => inicio >= 1 and fin >= inicio
+        Vi.Mensaje := "Los indices tienen que cumplir 1 <= inicio <= fin"
+        Vi.TipoError := Err_ValorArgError
+        Integer.TipoError := Err_FuncArgError
+        inicio := Err_VerificarArg_Prv(inicio, "inicio", 4, Integer)
+        fin := Err_VerificarArg_Prv(fin, "fin", 5, Integer, Vi)
+
+        if lista.Length == 0 or (fin - inicio) <= 0
+            return
+
+        medio := (fin-inicio) // 2 + 1
+
+        lista.Ordenar(lista, comparar, inicio, medio)
+        lista.Ordenar(lista, comparar, medio+1, fin)
+
+        _Util_Combinar_Prv(lista, comparar, inicio, medio, fin)
+    }
+
+    ; Se añade como método a Map y Array
+    Array.Prototype.DefineProp("Ordenar", {Call: _Util_OrdenarListaM})
+    global Util_OrdenarLista := _Util_OrdenarListaM
+
+
+    /*
+        @function Util_EliminarDuplicadosMA
+
+        @decripción Eliminar los valores duplicados de una lista. La lista se modifica quedando con los valores no duplicados. 
+
+        @param {Array} lista - Array a eliminar sus duplicados
+        @param {Boolean} final - Si true se eliminan los elementos duplicados empezando por el final quedando como único no duplicado el primero; si false se eliminan los elementos duplicados desde el principio quedando como único no duplicado el último.
+    */
+    _Util_EliminarDuplicadosMA(lista, final := true) {        
+        valoresDup := Map()
+        indicesDup := Array()
+        indice := inc := final ? 1 : -1
+
+        loop lista.Length {
+            if !valoresDup.Has(lista[indice])
+                valoresDup[lista[indice]] := true
+            else
+                indicesDup.Push(indice)
+
+            indice += inc
+        }
+
+        for i in indicesDup
+            lista.RemoveAt(i)
+    }
+
+    ; Se añade como método a Array
+    Array.Prototype.DefineProp("EliminarDuplicados", {Call: _Util_EliminarDuplicadosMA})
+
+
+    /*
+        @function Util_EliminarDuplicadosMM
+
+        @decripción Eliminar los valores duplicados de un diccionario. El diccionario se modifica quedando con los valores no duplicados. 
+
+        @param {Map} dicc - Map a eliminar sus duplicados
+    */
+    _Util_EliminarDuplicadosMM(dicc) {       
+        valoresDup := Map()
+        clavesDup := Array()
+
+        for clave, valor in dicc {
+            if !valoresDup.Has(dicc[clave])
+                valoresDup[dicc[clave]] := true
+            else
+                clavesDup.Push(clave)
+        }
+
+        for clave in clavesDup
+            dicc.Delete(clave)
+    }
+
+    ; Se añade como método a Map
+    Map.Prototype.DefineProp("EliminarDuplicados", {Call: _Util_EliminarDuplicadosMM})
+
+
+    /*
+        @function _Util_EliminarDuplicados
+
+        @decripción Eliminar los valores duplicados obtenidos de un  un diccionario. El diccionario se modifica quedando con los valores no duplicados. 
+
+        @param {Map} dicc - Map a eliminar sus duplicados
+    */
+    _Util_EliminarDuplicados_Prv(enum, numArgs := 2) {
+        valoresDup := Map()
+        clavesDup := Array()
+
+        for clave, valor in dicc {
+            if !valoresDup.Has(dicc[clave])
+                valoresDup[dicc[clave]] := true
+            else
+                clavesDup.Push(clave)
+        }
+
+        for clave in clavesDup
+            dicc.Delete(clave)
+    }
+
+    _Util_EliminarDuplicados(enum, numArgs := 2) => _Util_EliminarDuplicados_Prv(Err_VerificarEnumerable(enum, numArgs), numArgs)
+
+    ; Se añade como método a Map
+    Enumerator.Prototype.DefineProp("EliminarDuplicados", {Call: _Util_EliminarDuplicados_Prv})
 
 
     /*
@@ -649,31 +708,240 @@ Util() {
 
     */
     class Util_MapOrden extends Map {
+        /*
+            @static Convertir
 
-        __New(comparar := (a, b) => StrCompare(String(a), String(b), true), asc := true, args*) {
-            if !(comparar is Func)
-                Err_Lanzar(TypeError, "El argumento comparar no es una función", ERR_ERRORES["ERR_ARG"], A_LineNumber)
+            @description Convertir un objeto Map a MapOrden. El objeto pasado queda modificado pasando a ser de tipo MapOrden
 
-            super._New(args*)
-            this._claves := this.Claves
-            this._comparar := comparar
-            this._asc := asc
+            @param {Map} dicc - Diccionario Map a ser convertido.
+            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación.
 
+            @throws {Err_TipoArgError} - Si dicc no es Map o comparar no es Func.
+            @throws {Err_FuncError} - Si no puede ordenar las claves.
+
+            @returns {MapOrden} - El objeto Map convertido a MapOrden.
+        */
+        static Convertir(dicc, comparar?) {
+            Err_VerificarArg_Prv(dicc, "dicc", 1, Es_Map(d) => dicc is Map)
+
+            _base := dicc.Base
+            dicc.Base := this.Prototype
+            dicc._claves := dicc.Claves()
+            if IsSet(comparar) {
+                try
+                    dicc.Comparar := comparar
+                catch as e {
+                    dicc.Base := _base
+                    dicc._claves := unset
+                    if dicc.HasProp("_comparar")
+                        dicc._comparar := unset
+                    throw e
+                }
+                
+            }
+
+            return dicc
         }
 
-        Set(args*) {
-            super.Set(args*)
+        /*
+            @static Convertir
+
+            @description Crear un objeto MapOrden a partir de un objeto Map. El objeto MapOrden obtenido es nuevo, aunque los elementos del diccionario no se clonan.
+
+            @param {Map} dicc - Diccionario Map a partir del cual crear un MapOrden.
+            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación.
+
+            @throws {Err_TipoArgError} - Si dicc no es Map o comparar no es Func.
+            @throws {Err_FuncError} - Si no puede ordenar las claves.
+
+            @returns {MapOrden} - El objeto MapOrden creado.
+        */
+        static Crear(dicc, comparar?) {
+            Err_VerificarArg_Prv(dicc, "dicc", 1, Es_Map(d) => dicc is Map)
+
+            dicc := dicc.Clone()
+            dicc.Base := this.Prototype
+            dicc._claves := dicc.Claves()
+            if IsSet(comparar)
+                dicc.Comparar := comparar
+
+            return dicc
         }
 
-        ToString() {
+        /*
+            @constructor
+
+            @param {Object} args - lista de argumentos en orden clave y valor para ser guardados en el MapOrden. Misma estructura de argumentos que se pasan para crear un Map().
+            @param {Func} comparar - Si no hay función de comparación, el orden del diccionario queda asignado el orden de insercción de los valores.
+        */
+        __New(comparar?, args*) {
+            try
+                super._New(args*)
+            catch as e
+                throw Err_ValorArgError("No se han podido crear el diccionario", , , , , e, "args", 1, args)
+
+            args.SubLista((i, v) => Mod(i, 2) == 1 and IsSet(v) and )
+            this._claves := args
+
+            if IsSet(comparar) {
+                this.Comparar := comparar
+                try
+                    this._claves.Ordenar(comparar)
+                catch as e
+                    throw MethodError.CrearErrorAHK("No se han podido ordenar las claves", , , , , e)
+            }
+        }
+
+        /*
+            @method Claves
             
+            @description Obtener las claves ya ordenadas del diccionario. Este método sobrecarga a Claves de Map. Si se pasan valores, se obtienen las claves que estén asociadas a ese valor.
+
+            @param {Object} valor - Valores a ser comparado con los de cada clave.
+
+            @returns {Array} - Array de claves obtenidas.
+        */
+        Claves(valor?) {
+            if IsSet(valor) {
+                _claves := []
+                for clave in this._claves
+                    if this[clave] == valor
+                        _claves.Push(clave)
+
+                return _claves
+            }
+ 
+            return this._claves.Clone()
+        }
+
+
+        /*
+            @property Comparar
+
+            @description Propiedad para guardar y obtener la función de comparación. Al guardar la función se reordenan las claves.
+
+            @throws {PropertyError} - Si al obtener la función con get no hay ninguna guardada.
+            @throws {Err_TipoArgError} - Si no se pasa una función que admita dos argumentos para ser guardada.
+            @throws {MethodError} - Si hay error al reordenar las claves.
+        */
+        Comparar {
+            get {
+                if this.HasProp("_comparar")
+                    return this._comparar
+                else
+                    throw PropertyError.CrearErrorAHK("No hay guardada ninguna función de comparación")
+            }
+
+            set {
+                EF(f) => f is Func and f.AdmiteNumArgs(2)
+                EF.Mensaje := "No es función o no admite 2 argumentos"
+                Err_VerificarArg_Prv(value, "value", 1, Ef)
+                
+                this._comparar := value
+                try
+                    this._claves.Ordenar(value)
+                catch as e
+                    throw MethodError.CrearErrorAHK("No se han podido reordenar las claves", , , , , e)
+            }
+        }
+
+        /*
+            @method Set
+
+            @description Similar al método Set de Map, pero reordenando todas las claves.
+
+            @throws {MethodError} - Si hay error al reordenar las claves.
+            @throws {Err_ValorArgError} - Si no se pueden guardar los valores como se haría en el Map.
+        */
+        Set(args*) {
+            try
+                super.Set(args*)
+            catch as e
+                throw Err_ValorArgError("No se han podido guardar los pares clave-valor", , , , , e, "args", 1, args)
+
+            args.SubLista((i, v) => Mod(i, 2) == 1 and IsSet(v))
+            try
+                comparar := this.Comparar
+
+            if IsSet(comparar) {
+                try
+                    args.Ordenar(comparar)
+                catch as e
+                    throw MethodError.CrearErrorAHK("No se han podido ordenar las claves", , , , , e)
+
+                this._claves.Push(args*)
+                _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length-args.Length+1, this._claves.Length)
+            }
+            else
+                this._claves.Push(args*)
+                
+
+        }
+
+        __Enum(numArgs) {
+            Va(n) => n == 1 or n == 2
+            Va.Mensaje := "El número de argumentos debe ser 1 o 2"
+            Err_VerificarArg_Prv(numArgs, "numArgs", 1, , Va)
+
+            Enum(&clave, &valor?) {
+                static indice := 1
+
+                if this.Count < indice or this._claves.Length < indice
+                    return false
+
+                clave := this._claves[indice++]
+                if IsSet(valor)
+                    valor := this[clave]
+
+                return true
+            }
+
+            return Enum
+        }
+
+        /*
+            @method Delete
+
+            @description Similar al método Delete de Map, pero eliminando también la clave de la ordenación de claves.
+
+            @param {Object} - Clave a borrar.
+
+            @throws {UnsetItemError} - Si la clave a borrar no existe.
+        */
+        Delete(clave) {
+            indices := this._claves.IndicesConValor(clave)
+            if indices.Length == 0
+                mensaje := "No existe la clave en la lista ordenada de claves"
+            else
+                try
+                    super.Delete(clave)
+                catch as e
+                    mensaje := "No existe la clave en el diccionario"
+
+            if IsSet(mensaje)
+                throw UnsetItemError.CrearErrorAHK(mensaje, , , , , e?)
+            
+            this._claves.RemoveAt(indices[1])
+        }
+
+        Clear() {
+            super.Clear()
+            this._claves := []
         }
     }
 
     /*
-        @class 
+        @class MapPrioridad
+
+        Cada clave tiene como valor un MapOrden, donde a su vez las claves para cada valor son objetos Prioridad {Nombre y valor prioridad}. Estos objetos se tienen que crear desde fuera para tener la referencia y poder acceder al valor de una prioridad concreta
+        El operador [] para acceder a cada elemento tiene dos valore [clave, referencia objeto prioridad]. En el caso de no haber referencia y solo clave, con get se devuelve el valor con mayor prioridad y con set se fija el valor con mayor prioridad, lanzando UnsetItem si no hay ningún valor guardado aún.
+        Para guardar los valores, se pasa un Map con un valor por cada prioridad.
+        MVP[clave] := valor ; guarda en el de mayor prioridad
+        MVP[clave] := Map ; guarda los valores por cada prioridad
+        Si se quieren meter muchos valores, usar función Set
+
     */
-    class Util_MapValorPrioritario extends Map {
+    class Util_MapPrioridad extends Map {
         /*
             @method Constructor
 
@@ -707,10 +975,11 @@ Util() {
             @param {Integer|String|Object} clave - clave de acceso a una entrada de Map.
             @param {Integer} indice - índice del array para acceder a uno de los valores. A mayor índice mayor prioridad. Si está indefinido se obtiene el valor del índice más alto (mayor prioridad).
 
+            Si no existe la prioridad, dar la opción de obtener el valor con la prioridad más alta de entre las que están por debajo
             @method
                 get -
         */
-        __Item[clave, indice?, maxValor?] {
+        __Item[clave, prioridad?, extricto := true] {
             get {
                 if IsSet(indice) {
 
@@ -748,9 +1017,7 @@ Util() {
         @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
     */
     _Util_ContieneValor(enum, valor, numArgs := 2, posValor := 2) {
-        Ve(e) => Err_VerificarEnumerable(e, numArgs)
-        Ve.Mensaje := "Enumerable no válido: número de argumentos incompatible o tipo de objeto incorrecto"
-        enum := Err_VerificarArg_Prv(enum, "enum", 1, , , Ve)
+        enum := Err_VerificarEnumerable(enum, numArgs)
 
         Vp(pos) => pos >= 1 and pos <= numArgs
         Vp.Mensaje := "La posición del valor tiene que estar entre 1 y el número de argumentos"
