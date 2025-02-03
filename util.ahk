@@ -339,16 +339,19 @@ if (!IsSet(__UTIL_H__)) {
         Ff.Mensaje := "No es una función o no admite 2 argumentos índice, valor"
         Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
 
-        enum := Err_VerificarEnumerable(lista.Clone(), 2)
-        removidos := 0
+        enum := Err_VerificarEnumerable(lista, 2)
+        borrables := []
         for i, valor in enum
             try 
                 if !filtro(i, valor?)
-                    lista.RemoveAt(i-(removidos++))
+                    borrables.Push(i)
             catch as e
                 throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
-        catch as e 
-            throw Err_FuncError("Fallo al recorrer el enumerable de la lista", , , , , e, enum)    
+
+        i := -1
+        Loop borrables.Length
+            lista.RemoveAt(borrables[i--])
+
     }
     
     ; Se añade como método a Array
@@ -373,18 +376,18 @@ if (!IsSet(__UTIL_H__)) {
         Ff(f) => Err_AdmiteNumArgs(f, 2)
         Ff.Mensaje := "No es una función o no admite 2 argumentos clave, valor"
         Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
+        enum := Err_VerificarEnumerable(dicc, 2)
 
-        enum := Err_VerificarEnumerable(dicc.Clone(), 2)
-        try
-            for clave, valor in enum
-                try 
-                    if !filtro(clave, valor)
-                        dicc.Delete(clave)
-                catch as e
-                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
-        catch as e 
-            throw Err_FuncError("Fallo al recorrer el enumerable del diccionario", , , , , e, enum)
-    
+        borrables := []
+        for clave, valor in enum
+            try 
+                if !filtro(clave, valor)
+                    borrables.Push(clave)
+            catch as e
+                throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+
+        for clave in borrables
+            dicc.Delete(clave)
     }
     
     ; Se añade como método a Map
@@ -626,9 +629,9 @@ if (!IsSet(__UTIL_H__)) {
     _Util_EliminarDuplicadosMA(lista, final := true) {        
         valoresDup := Map()
         indicesDup := Array()
-        indice := inc := final ? 1 : -1
 
-        loop lista.Length {
+        indice := inc := final ? 1 : -1
+        Loop lista.Length {
             if !valoresDup.Has(lista[indice])
                 valoresDup[lista[indice]] := true
             else
@@ -637,8 +640,11 @@ if (!IsSet(__UTIL_H__)) {
             indice += inc
         }
 
-        for i in indicesDup
-            lista.RemoveAt(i)
+        indice := inc := final ? -1 : 1
+        Loop indicesDup.Length {
+            lista.RemoveAt(indicesDup[indice])
+            indice += inc
+        }
     }
 
     ; Se añade como método a Array

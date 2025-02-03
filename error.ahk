@@ -96,6 +96,58 @@ if (!IsSet(__ERR_H__))
 
     global Err_EsCadena := _Err_EsCadena
 
+
+    /*
+        @class FuncArg
+
+        @description Tipo de Func usado para envolver las funciones que serán usadas en la comprobación de los argumentos. Los tipos de función que puede envolver son:
+        - "ComprobarTipo"
+    */
+    class FuncArg extends Func {
+        static CODIGOS_TIPO_FUNC := Map("ComprobarTipo", 1, "ValidarValor", 2, "ConvertirValor", 3)
+        static _TIPOS_ERROR := Map(this.TIPOS_FUNC["ComprobarTipo"], Err_TipoArgError, this.TIPOS_FUNC["ValidarValor"], Err_ValorArgError, this.TIPOS_FUNC["ConvertirValor"], Err_FuncArgError)
+        static _MENSAJES := Map(this.TIPOS_FUNC["ComprobarTipo"], "El tipo del valor no cumple", this.TIPOS_FUNC["ValidarValor"], "El valor no cumple la validación de", this.TIPOS_FUNC["ConvertirValor"], "El valor no se puede convertir con")
+
+        __New(funcion, codigoTipoFunc, mensaje?, tipoError?) {
+            ; No podemos usar Err_VerificarArg porque crearíamos un bucle
+
+            if !_Err_AdmiteNumArgs(funcion, 1)
+                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_TipoArgError("No has pasado una función o ésta no admite 1 argumento.", , , , , , "funcion", 1, funcion, Type(funcion))
+            
+            if !this.CODIGOS_TIPO_FUNC.ContieneValor(codigoTipoFunc)
+                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_ValorArgError("El código del tipo de función no representa uno de los posibles", , , , , , "codigoTipoFunc", 2, codigoTipoFunc)
+          
+            if IsSet(mensaje)
+                try
+                    mensaje := String(mensaje)
+                catch as e
+                    throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_TipoArgError("El mensaje debe ser una cadena o convertible a cadena", , , , , , "mensaje", 3, mensaje, Type(mensaje))
+            else
+                mensaje := FuncArg._MENSAJES[codigoTipoFunc] . this.Name
+
+            if IsSet(tipoError) and tipoError != Err_ArgError and !tipoError.HasBase(Err_ArgError)
+                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : Err_TipoArgError("El tipo de error no es Err_ArgError", , , , , , "tipoError", 4, tipoError, Type(tipoError))
+            else
+                tipoError := FuncArg._TIPOS_ERROR[codigoTipoFunc]
+            
+            this.Call := funcion
+
+        }
+
+        Mensaje {
+
+        }
+
+        TipoError {
+            get
+
+        }
+
+        TipoFunc {
+
+        }
+
+    }
 ; **** Hacer todas estas funciones y usarlas en todos los DefineProp y VerificarArg. Y acabar los errores después de los cambios.
 
     Err_Cadena(valor) => String(valor)
@@ -378,7 +430,7 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la fecha no tiene el formato correcto.
         */
-        __New(mensaje, what := ERR_FUNCION_ORIGEN["ACTUAL"], extra?, codigo := ERR_ERRORES["ERROR"], fecha := A_Now, errorPrevio?) {
+        __New(mensaje, what := ERR_FUNCION_ORIGEN["ACTUAL"], extra?, codigo := Err_Error.ERRORES["ERROR"], fecha := A_Now, errorPrevio?) {
             ; AHK no lanza un nuevo Error si falla la creación de super. Termina el programa evitando posibles bucles.
             super.__New(mensaje, what, extra?)
             Err_ErroresPersonalizadosActivo := false
@@ -553,7 +605,7 @@ if (!IsSet(__ERR_H__))
             try
                 _texto .= this.PosArg
             catch
-                _texto .= "<Sin posición"
+                _texto .= "<Sin posición>"
 
             _texto .= ". ValorArg: "
             try
