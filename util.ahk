@@ -68,7 +68,7 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_CrearLista
 
-        @description Crear una lista de valores del 1 al número de elementos pasado.
+        @description Crear una lista con valores del 1 al número de elementos pasado.
 
         @param {Integer} numElementos - Número de elementos que tendrá la lista
         @param {Boolean} asc - Si los valores van de 1 al número de elementos, o del número de elementos a 1.
@@ -79,11 +79,17 @@ if (!IsSet(__UTIL_H__)) {
         numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, IsInteger, (n) => n >= 0, Integer)
 
         lista := []
-        if asc {}
-            valor := 1
+        if !asc {
+            valor := numElementos + 1
+            factor := -1
+        }
+        else {
+            valor := 0
+            factor := 1
+        }
 
         Loop numElementos
-            lista.Push(A_Index) numElementos+1-A_Index
+            lista.Push(valor + factor*A_Index)
 
         return lista
     }
@@ -209,6 +215,7 @@ if (!IsSet(__UTIL_H__)) {
             return e.What
         }
     }
+
 
     global Util_Llamante := _Util_Llamante
 
@@ -536,9 +543,8 @@ if (!IsSet(__UTIL_H__)) {
         claves := Array()
 
         if IsSet(valores) {
-            Vv(v) => v.Length == numArgs-1
-            Vv.Mensaje := "El número de valores debe ser igual al numArgs-1 del enumerable"
-            enum := Err_VerificarArg_Prv(valores, "valores", 3, , , Vv)
+            Err_VerificarArg_Prv(valores, "valores", 3, FuncArg((v) => v.Length <= numArgs-1, FuncArg.TIPO_FUNC["Validar"], "El número de valores debe ser igual al numArgs-1 del enumerable"))
+            valores.Length := numArgs-1
 
             try
                 while enum(&clave, valoresRef*) {
@@ -1046,19 +1052,23 @@ if (!IsSet(__UTIL_H__)) {
         @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
         @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
     */
-    _Util_ContieneValor(enum, valor, numArgs := 2, posValor := 2) {
+    _Util_ContieneValor(enum, numArgs := 2, valores*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
 
-        Vp(pos) => pos >= 1 and pos <= numArgs
-        Vp.Mensaje := "La posición del valor tiene que estar entre 1 y el número de argumentos"
-        Err_VerificarArg_Prv(posValor, "posValor", 4, IsInteger, Vp, Integer)
+        if valores.Length > numArgs-1 {
+            m := "El número de valores debe ser igual al numArgs-1 del enumerable"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , valores, 3, valores)
+        }
+        valores.Length := numArgs-1
 
         valoresRef := Array()
         Loop numArgs
             valoresRef.Push(Util_CrearVarRef())
 
         while enum(valoresRef*)
-            if IsSet(%valoresRef[posValor]%) and %valoresRef[posValor]% == valor
+            for valorRef in valoresRef
+                if !(!IsSet(%valorRef%) and !IsSet(valores[A_Index]) or (IsSet(%valorRef%) and IsSet(valores[A_Index]) and valores[A_Index] == %valorRef%)) {
+         if IsSet(%valoresRef[posValor]%) and %valoresRef[posValor]% == valor
                 return true
 
         return false

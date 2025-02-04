@@ -98,84 +98,6 @@ if (!IsSet(__ERR_H__))
 
 
     /*
-        @class FuncArg
-
-        @description Tipo de Func usado para envolver las funciones que serán usadas en la comprobación de los argumentos. Los tipos de función que puede envolver son:
-        - "ComprobarTipo"
-    */
-    class FuncArg extends Func {
-        static CODIGOS_TIPO_FUNC := Map("ComprobarTipo", 1, "ValidarValor", 2, "ConvertirValor", 3)
-        static _TIPOS_ERROR := Map(this.TIPOS_FUNC["ComprobarTipo"], Err_TipoArgError, this.TIPOS_FUNC["ValidarValor"], Err_ValorArgError, this.TIPOS_FUNC["ConvertirValor"], Err_FuncArgError)
-        static _MENSAJES := Map(this.TIPOS_FUNC["ComprobarTipo"], "El tipo del valor no cumple", this.TIPOS_FUNC["ValidarValor"], "El valor no cumple la validación de", this.TIPOS_FUNC["ConvertirValor"], "El valor no se puede convertir con")
-
-        __New(funcion, codigoTipoFunc, mensaje?, tipoError?) {
-            ; No podemos usar Err_VerificarArg (ni DefinirPropEstandar) porque crearíamos un bucle
-
-            this.Funcion := funcion
-            this.CodigoTipoFunc := codigoTipoFunc         
-            if IsSet(mensaje)
-                this.Mensaje := mensaje
-            if IsSet(tipoError) 
-                this.TipoError := tipoError            
-        }
-
-        Call(arg) => (this.Funcion)(arg)
-
-        Mensaje {
-            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Name
-
-            set {
-                try
-                    this._mensaje := String(value)
-                catch as e {
-                    m := "El mensaje debe ser una cadena o convertible a cadena"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "Mensaje", 1, value, Type(value))
-                }
-            }
-        }
-
-        CodigoTipoFunc {
-            get => this._codigoTipoFunc
-
-            set {
-                if !this.CODIGOS_TIPO_FUNC.ContieneValor(value) {
-                    m := "El código del tipo de función no es válido"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "CodigoTipoFunc", 1, value)
-                }
-
-                this._codigoTipoFunc := Integer(value)
-            }
-        }
-
-        TipoError {
-            get => this.HasProp("_tipoError") ? this._tipoError : FuncArg._TIPOS_ERROR[this.CodigoTipoFunc]
-
-            set {
-                if !(value is Class) or (value != Err_ArgError and !value.HasBase(Err_ArgError)) {
-                    m := "El tipo de error no es Err_ArgError"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "TipoError", 1, value, Type(value))
-                }
-
-                this._tipoError := value
-            }
-        }
-
-        Funcion {
-            get => this._funcion
-
-            set {
-                if !_Err_AdmiteNumArgs(value, 1) {
-                    m := "No has pasado una función o ésta no admite 1 argumento"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "Funcion", 1, value, Type(value))
-                }
-
-                this._funcion := value
-            }
-        }
-    }
-
-
-    /*
         @function Err_AdmiteNumArgs
 
         @description Comprobar si una función admite un número de argumentos.
@@ -188,17 +110,24 @@ if (!IsSet(__ERR_H__))
         @returns true o false.
     */
     _Err_AdmiteNumArgsM(funcion, numArgs) {
-       ; No podemos usar Err_VerificarArg (ni DefinirPropEstandar) porque crearíamos un bucle
+       ; No podemos llamar a Err_VerificarArg (ni DefinirPropEstandar) porque necesitamos FuncArg y crearíamos un bucle
 
-        ValidarNumArgs(n) => Integer(numArgs) >= 0
-        ValidarNumArgs.Mensaje := "El número de argumentos debe ser entero >= 0"
-        _Err_VerificarArg_Prv(numArgs, "numArgs", 2, IsInteger, ValidarNumArgs, Integer)
+        if !IsInteger(numArgs) {
+            m := "El valor de numArgs debe ser entero"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "numArgs", 2, numArgs, Type(numArgs))
+        }
+
+        numArgs := Integer(numArgs)
+        if numArgs < 0 {
+            m := "El número de argumentos debe ser entero >= 0"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "numArgs", 2, numArgs)
+        }
 
         return numArgs >= funcion.MinParams and (numArgs <= funcion.MaxParams or funcion.IsVariadic)
     }
 
     _Err_AdmiteNumArgs(funcion, numArgs) {
-        ; No podemos usar Err_VerificarArg (ni DefinirPropEstandar) porque crearíamos un bucle
+       ; No podemos llamar a Err_VerificarArg (ni DefinirPropEstandar) porque necesitamos FuncArg y crearíamos un bucle
 
         if !Err_EsLlamable(funcion) {
             m := "No has pasado una función o un objeto llamable"
@@ -230,16 +159,14 @@ if (!IsSet(__ERR_H__))
         @returns {Map} Diccionario con un valor Bool por cada posición solicitada (clave), indicando si el argumento de las posición es por referencia (true) o no (false)
     */
     _Err_VerificarArgsRefM(funcion, recibeThis := false, posArgs*) {
-        ; Esta comparación es redundante 
-        inc := !recibeThis ? 0 : 1
+        inc := !!recibeThis
 
         if posArgs.Lenght == 0
             posArgs := Util_CrearLista(funcion.MaxParams - inc)
 
         resultado := Map()
         for posArg in posArgs {
-            if !IsInteger(posArg)
-                throw Err_TipoArgError("Las posición #" A_Index " pasada no es un entero" , , , , , "posArgs[" A_Index "]", 2, posArg, Type(posArg))
+            posArg := _Err_VerificarArg_Prv(posArg, "posArgs[" A_Index "]", 2 + A_Index, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]))
 
             try
                 resultado[posArg] := funcion.IsByRef(posArg + inc)
@@ -251,10 +178,10 @@ if (!IsSet(__ERR_H__))
     }
 
     _Err_VerificarArgsRef(funcion, posArgs*) {
-        _Err_VerificarArg_Prv(funcion, "funcion", 1, Err_EsLlamable)
+        _Err_VerificarArg_Prv(funcion, "funcion", 1, FuncArg(Err_EsLlamable, FuncArg.TIPO_FUNC["Comprobar"]))
         ; No se comprueba posArgs porque se comprueba luego al recorrerla. Si no se recorrería dos veces.
 
-        return !(funcion is Func) ?  funcion.Call.VerificarArgsRef(funcion, true, posArgs*) : funcion.VerificarArgsRef(funcion, false, posArgs*)
+        return !(funcion is Func) ?  funcion.Call.VerificarArgsRef(true, posArgs*) : funcion.VerificarArgsRef(false, posArgs*)
     }
 
     Func.Prototype.DefineProp("VerificarArgsRef", {Call: _Err_VerificarArgsRefM})
@@ -273,7 +200,6 @@ if (!IsSet(__ERR_H__))
 
         @throws {Err_MethodError} - Si se lanza algún error al ejecutar enum.__Enum.
         @throws {Err_TipoArgError} - Si el objeto devuelto por __Enum, o el propio enum en su defecto, no es llamable o no admite el número de argumentos numArgs (todos por referencia).
-        @throws {Err_ValueError} - Si el Enumerator no admite numArgs como número de argumentos o éste no es número válido entero >= 0 (se permiten enumerators con 0 argumentos).
 
         @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
         ¿Restringir la función a Enumerator en lugar de aceptarla siendo simplemente Llamable (Call)? Un Enumerator es una función que admite 
@@ -284,21 +210,27 @@ if (!IsSet(__ERR_H__))
         if enum.HasMethod("__Enum") {
             try 
                 enum := enum.__Enum(numArgs)
-            catch as e
-                throw MethodError.CrearErrorAHK("__Enum(numArgs) da error y no puede obtener ningún resultado", , , , , e)
+            catch as e {
+                m := "__Enum(numArgs) da error y no puede obtener ningún resultado"
+                throw !Err_ErroresPersonalizadosActivo ? Error(m) : MethodError.CrearErrorAHK(m, , , , , e)
+            }
 
             mensajeBase := "El objeto obtenido de __Enum"
         }
         else
             mensajeBase := "El propio objeto enum (no hay __Enum)"
 
-        Ad(e) => Err_AdmiteNumArgs(e, numArgs)
-        Ad.Mensaje := mensajeBase " no es llamable o no admite el número de argumentos"
-        enum := Err_VerificarArg_Prv(enum, "enum", 1, Ad)
+        if !Err_AdmiteNumArgs(enum, numArgs) {
+            m := mensajeBase . " no admite el número de argumentos"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "enum", 1, enum, Type(enum))
+        }
 
+        ; No se comprueba si esto lanza excepción porque enum es llamable y admite el número de argumentos.      
         posArgs := Util_ObtenerClaves(Err_VerificarArgsRef(enum, Util_CrearLista(numArgs), 2, false))
-        if posArgs.Length != 0
-            throw Err_TipoArgError(mensajeBase " no admite parámetros por referencia en sus argumentos #" posArgs, , , , , , "enum", 1, Type(enum))
+        if posArgs.Length != 0 {
+            m := mensajeBase . " no admite parámetros por referencia en sus argumentos #" posArgs
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m , , , , , , "enum", 1, enum, Type(enum))
+        }
 
         /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
 
@@ -316,56 +248,37 @@ if (!IsSet(__ERR_H__))
         @param {Object} valorArg - Valor del argumento a comprobar.
         @param {String} nombreArg - Nombre del argumento.
         @param {Integer} posArg - Posición del argumento.
-        @param {Func} funciones - Funciones de verificación que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento valorArg. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
-        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión de valorArg, y lo que devuelva se usará como nuevo valorArg. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
+        @param {FuncArg} funciones - Funciones de verificación FuncArg que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento valorArg.
 
         @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
 
-        @throws {Error/Err_TipoArgError} - Si el valorArg no es de tipo correcto.        
-        @throws {Error/Err_ValorArgError} - Si el valorArg no cumple la validación del valor..
-        @throws {Error/Err_FuncArgError} - Si el valorArg no puede ser convertido.
+        @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
     _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*) {
-        esCorrecto := true
-        argsExtra := []
         for funcion in funciones {
-            if funcion.TipoError == Err_FuncArgError {
+            if funcion.CodigoTipoFunc == FuncArg.TIPO_FUNC["Convertir"] {
                 try
                     valorArg := funcion(valorArg)
-                catch as e {
-                    argsExtra.Push(funcion)
-                    try
-                        mensaje := String(funcion.Mensaje)
-                    catch
-                        mensaje := "El valor no se puede convertir con" funcion.Name
-                    
+                catch as e
                     esCorrecto := false
-                }
             }
             else {
                 try
                     esCorrecto := funcion(valorArg) 
-                catch as e {
-                    if funcion.TipoError == Err_TipoArgError {
-                        argsExtra.Push(Type(valorArg))
-                        try
-                            mensaje := String(funcion.Mensaje)
-                        catch
-                            mensaje := "El tipo del valor no cumple" funcion.Name
-                    }
-                    else if funcion.TipoError == Err_ValorArgError {
-                        try
-                            mensaje := String(funcion.Mensaje)
-                        catch
-                            mensaje := "El valor no cumple la validación de" funcion.Name
-                    }
-
+                catch as e
                     esCorrecto := false
-                }
             }
 
-            if !esCorrecto
-                throw !Err_ErroresPersonalizadosActivo ? Error(mensaje) : funcion.tipoError(mensaje, , , , , e?, nombreArg?, posArg?, argsExtra*)
+            if IsSet(esCorrecto) and !esCorrecto {
+                switch funcion.TipoError {
+                    case Err_TipoArgError:
+                        argsExtra := [Type(valorArg)]
+                    default:
+                        argsExtra := []              
+                }
+
+                throw !Err_ErroresPersonalizadosActivo ? Error(funcion.Mensaje) : funcion.TipoError(funcion.Mensaje, , , , , e?, nombreArg?, posArg?, valorArg, argsExtra*)
+            }
         }
 
         return valorArg
@@ -382,24 +295,17 @@ if (!IsSet(__ERR_H__))
         @param {Object} valorArg - Valor del argumento a comprobar.
         @param {String} nombreArg - Nombre del argumento.
         @param {Integer} posArg - Posición del argumento.
-        @param {Func} comprobarTipo - Función que devolverá true o false si el valor no es del tipo correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple el Tipo. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error.
-        @param {Func} validarValor - Función que devolverá true o false si el valor no es valido. Esta función supone que el tipo del valor es el correcto. Si el objeto Func tiene la propiedad Mensaje se usa como mensaje de error en la excepción si no se cumple la validación. Si no tiene propiedad Mensaje, se usa el nombre de la función en el mensaje de error.
-        @param {Func} convertirValor - Función que devolverá el valor convertido. Esta función supone que el tipo del valor es el correcto y que pasa la validación.
+        @param {FuncArg} funciones - Funciones de verificación FuncArg que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento valorArg.
 
         @returns El valor del argumento convertido si existe función de convertir, o el propio valor si no existe.
 
-        @throws {TypeError/Err_TipoArgError} - Si algún argumento no es de tipo correcto.        
-        @throws {ValueError/Err_ValorArgError} - Si algún argumento no ecumple la validación de valor.
+        @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
     _Err_VerificarArg(valorArg, nombreArg?, posArg?, funciones*) {
         ; nombreArg y posArg solo sirven de información a ser incluida en el error lanzado en caso de fallo en la verificación. Ambos ya se comprueban en el único sitio donde se usan: constructor del Error a lanzar si falla la verificación.
 
-        FuncOK(f) => _Err_AdmiteNumArgs(f, 1) and f.HasProp("TipoError") and f.TipoError.HasBase(Err_ArgError)
-        FuncOK.Mensaje := "No es una función, no admite un argumento o no tiene propiedad TipoError con un tipo Err_ArgError"
-        FuncOK.TipoError := Err_TipoArgError
-
         for funcion in funciones {
-            _Err_VerificarArg_Prv(funcion, , 3 + A_Index, FuncOK)
+            _Err_VerificarArg_Prv(funcion, "funciones[" A_Index "]", 3 + A_Index, FuncArg((f) => f is FuncArg, FuncArg.TIPO_FUNC["Comprobar"], "No es una función FuncArg"))
 
             /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
@@ -409,7 +315,92 @@ if (!IsSet(__ERR_H__))
 
     global Err_VerificarArg := _Err_VerificarArg
 
+
+
+
+    /*** TIPOS DE DATOS PARA COMPROBACIÓN DE ERRORES ***/
     
+    /*
+        @class FuncArg
+
+        @description Tipo usado para envolver las funciones que serán usadas en la verificación de los argumentos (Err_VerificarArg). La función a envolver puede ser un objeto llamable o de tipo Func. Los tipos de función que puede envolver son:
+        - "Comprobar": Admite un argumento y devuelve true/false. Sirven para hacer comprobaciones del tipo de dato del argumento. Por defecto lanzan Err_TipoArgError en caso de no pasar la comprobación o lanzar algún error.
+        - "Validar": Admite un argumento y devuelve true/false. Sirven para validar el valor del argumento. Por defecto lanzan Err_ValorArgError en caso de no pasar la validación o lanzar algún error.
+        - "Convertir": Admite un argumento y devuelve un valor. Sirven para realizar conversiones en el argumento. Por defecto lanzan Err_FuncArgError en caso de no poder realizar la conversión o lanzar algún error.
+        Los tipos de error asociados con la función tienen que ser Err_ArgError.
+    */
+    class FuncArg {
+        static TIPO_FUNC := Map("Comprobar", 1, "Validar", 2, "Convertir", 3)
+        static _TIPO_ERROR := Map(this.TIPOS_FUNC["Comprobar"], Err_TipoArgError, this.TIPOS_FUNC["Validar"], Err_ValorArgError, this.TIPOS_FUNC["Convertir"], Err_FuncArgError)
+        static _MENSAJES := Map(this.TIPOS_FUNC["Comprobar"], "El valor no cumple la comprobación", this.TIPOS_FUNC["Validar"], "El valor no cumple la validación", this.TIPOS_FUNC["Convertir"], "No se ha podido aplicar al valor la conversión")
+
+        __New(funcion, codigoTipoFunc, mensaje?, tipoError?) {
+            ; No podemos usar Err_VerificarArg (ni DefinirPropEstandar) porque crearíamos un bucle
+
+            this.Funcion := funcion
+            this.CodigoTipoFunc := codigoTipoFunc         
+            if IsSet(mensaje)
+                this.Mensaje := mensaje
+            if IsSet(tipoError) 
+                this.TipoError := tipoError            
+        }
+
+        Call(arg) => (this.Funcion)(arg)
+
+        Mensaje {
+            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Funcion
+
+            set {
+                try
+                    this._mensaje := String(value)
+                catch as e {
+                    m := "El mensaje debe ser una cadena o convertible a cadena"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "Mensaje", 1, value, Type(value))
+                }
+            }
+        }
+
+        CodigoTipoFunc {
+            get => this._codigoTipoFunc
+
+            set {
+                if !this.TIPO_FUNC.ContieneValor(value) {
+                    m := "El código del tipo de función no es válido"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "CodigoTipoFunc", 1, value)
+                }
+
+                this._codigoTipoFunc := Integer(value)
+            }
+        }
+
+        TipoError {
+            get => this.HasProp("_tipoError") ? this._tipoError : FuncArg._TIPO_ERROR[this.CodigoTipoFunc]
+
+            set {
+                if !(value is Class) or (value != Err_ArgError and !value.HasBase(Err_ArgError)) {
+                    m := "El tipo de error no es Err_ArgError"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "TipoError", 1, value, Type(value))
+                }
+
+                this._tipoError := value
+            }
+        }
+
+        Funcion {
+            get => this._funcion
+
+            set {
+                if !_Err_AdmiteNumArgs(value, 1) {
+                    m := "No has pasado una función u objeto llamable, o no admite 1 argumento"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "Funcion", 1, value, Type(value))
+                }
+
+                this._funcion := value
+            }
+        }
+    }
+
+
 
 
     /*** EXCEPCIONES PERSONALIZADAS ***/
