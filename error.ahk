@@ -143,12 +143,12 @@ if (!IsSet(__ERR_H__))
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "CodigoTipoFunc", 1, value)
                 }
 
-                this._codigoTipoFunc := value
+                this._codigoTipoFunc := Integer(value)
             }
         }
 
         TipoError {
-            get => this._tipoError
+            get => this.HasProp("_tipoError") ? this._tipoError : FuncArg._TIPOS_ERROR[this.CodigoTipoFunc]
 
             set {
                 if !(value is Class) or (value != Err_ArgError and !value.HasBase(Err_ArgError)) {
@@ -156,7 +156,7 @@ if (!IsSet(__ERR_H__))
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "TipoError", 1, value, Type(value))
                 }
 
-                this._tipoError := FuncArg._TIPOS_ERROR[this.CodigoTipoFunc]
+                this._tipoError := value
             }
         }
 
@@ -168,6 +168,8 @@ if (!IsSet(__ERR_H__))
                     m := "No has pasado una función o ésta no admite 1 argumento"
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "Funcion", 1, value, Type(value))
                 }
+
+                this._funcion := value
             }
         }
     }
@@ -216,6 +218,31 @@ if (!IsSet(__ERR_H__))
     global Err_AdmiteNumArgs := _Err_AdmiteNumArgs
 
     
+    /*
+
+    */
+    _Err_VerificarArgsRefM(funcion, posArgs*) {
+        if !(funcion is Func) {
+            _funcion := funcion.Call
+        }
+
+        Loop numArgs
+            if !_enum.Call.IsByRef(A_Index)
+                throw Err_TipoArgError(mensajeBase " no admite por referencia el parámetro #" A_Index, , , , , , "enum", 1, Type(enum))
+        
+    }
+
+    _Err_VerificarArgsRef(funcion, posArgs*) {
+        _Err_VerificarArg_Prv(funcion, "funcion", 1, Err_EsLlamable)
+
+        _Err_VerificarArgsRef(funcion, posArgs*)
+
+    }
+
+    Func.Prototype.DefineProp("VerificarArgsRef", {Call: _Err_VerificarArgsRefM})
+    global Err_VerificarArgsRef := _Err_VerificarArgsRef
+
+
     /*
         @function Err_VerificarEnumerable
 
