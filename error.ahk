@@ -219,24 +219,42 @@ if (!IsSet(__ERR_H__))
 
     
     /*
+        @function Err_VerificarArgsRef
 
+        @description Verificar que los argumentos de una función tienen que ser pasados por referencia. Tener en cuenta que si se pasa un método de un objeto (como Call), el primer argumento es el objeto this.
+
+        @param {Func} funcion - Función u objeto llamable a comprobar sus argumentos.
+        @param {Integer} posArgs - Serie de posiciones de los argumentos que se serán comprobados. Si no se pasa nada, se comprobarán todos los argumentos de la función sin incluir los variables. Si una posición se pasa repetida, en el resultado solo aparece una vez.
+        @param {Boolean} recibeThis - Si la función recibe this como primer argumento. Muy útil por si se pasa una función Call de un objeto llamable.
+
+        @returns {Map} Diccionario con un valor Bool por cada posición solicitada (clave), indicando si el argumento de las posición es por referencia (true) o no (false)
     */
-    _Err_VerificarArgsRefM(funcion, posArgs*) {
-        if !(funcion is Func) {
-            _funcion := funcion.Call
-        }
+    _Err_VerificarArgsRefM(funcion, recibeThis := false, posArgs*) {
+        ; Esta comparación es redundante 
+        inc := !recibeThis ? 0 : 1
 
-        Loop numArgs
-            if !_enum.Call.IsByRef(A_Index)
-                throw Err_TipoArgError(mensajeBase " no admite por referencia el parámetro #" A_Index, , , , , , "enum", 1, Type(enum))
+        if posArgs.Lenght == 0
+            posArgs := Util_CrearLista(funcion.MaxParams - inc)
+
+        resultado := Map()
+        for posArg in posArgs {
+            if !IsInteger(posArg)
+                throw Err_TipoArgError("Las posición #" A_Index " pasada no es un entero" , , , , , "posArgs[" A_Index "]", 2, posArg, Type(posArg))
+
+            try
+                resultado[posArg] := funcion.IsByRef(posArg + inc)
+            catch as e
+                throw Err_ValorArgError("La posición " posArg "del argumento no es válida en la función", , , , , e, "posArgs[" A_Index "]", 2, posArg)
+        }
         
+        return resultado
     }
 
     _Err_VerificarArgsRef(funcion, posArgs*) {
         _Err_VerificarArg_Prv(funcion, "funcion", 1, Err_EsLlamable)
+        ; No se comprueba posArgs porque se comprueba luego al recorrerla. Si no se recorrería dos veces.
 
-        _Err_VerificarArgsRef(funcion, posArgs*)
-
+        return !(funcion is Func) ?  funcion.Call.VerificarArgsRef(funcion, true, posArgs*) : funcion.VerificarArgsRef(funcion, false, posArgs*)
     }
 
     Func.Prototype.DefineProp("VerificarArgsRef", {Call: _Err_VerificarArgsRefM})
@@ -278,13 +296,9 @@ if (!IsSet(__ERR_H__))
         Ad.Mensaje := mensajeBase " no es llamable o no admite el número de argumentos"
         enum := Err_VerificarArg_Prv(enum, "enum", 1, Ad)
 
-        ; No se puede asegurar si los argumentos son todos por referencia, porque puede tener un número variable de argumentos, admitir las referencias y dentro de la función acceder a ellas con %%. Funcionaría perfectamente sin tener argumentos que reciben obligatoriamente valores por referencia.
-        if !(enum is Func)
-            _enum := enum.Call
-
-        Loop numArgs
-            if !_enum.Call.IsByRef(A_Index)
-                throw Err_TipoArgError(mensajeBase " no admite por referencia el parámetro #" A_Index, , , , , , "enum", 1, Type(enum))
+        posArgs := Util_ObtenerClaves(Err_VerificarArgsRef(enum, Util_CrearLista(numArgs), 2, false))
+        if posArgs.Length != 0
+            throw Err_TipoArgError(mensajeBase " no admite parámetros por referencia en sus argumentos #" posArgs, , , , , , "enum", 1, Type(enum))
 
         /* Aquí se comprobaría si la ejecución del Enumerator es maliciosa, pero sin ejecutarlo porque entonces ya no se podría reutilizar */       
 

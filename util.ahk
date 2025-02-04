@@ -66,6 +66,30 @@ if (!IsSet(__UTIL_H__)) {
 
 
     /*
+        @function Util_CrearLista
+
+        @description Crear una lista de valores del 1 al número de elementos pasado.
+
+        @param {Integer} numElementos - Número de elementos que tendrá la lista
+        @param {Boolean} asc - Si los valores van de 1 al número de elementos, o del número de elementos a 1.
+
+        @returns {Array} - Lista con los valores
+    */
+    Util_CrearLista(numElementos, asc := true) {
+        numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, IsInteger, (n) => n >= 0, Integer)
+
+        lista := []
+        if asc {}
+            valor := 1
+
+        Loop numElementos
+            lista.Push(A_Index) numElementos+1-A_Index
+
+        return lista
+    }
+
+
+    /*
         @function Util_EsDescendiente
 
         @description Saber si un objeto clase es descendiente o heredero.
@@ -489,7 +513,7 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_ObtenerClaves
         
-        @description Obtener la lista formada por el primer valor de cada uno de los elementos de un enumerable. En caso de Array se obtiene lista de índices, y en caso de Map se obtiene lista de claves. Si se pasan valores, los primeros valores obtenidos son los de aquellos elementos cuyo resto de valores coincide con los valores pasados en orden; en cuanto se pasan valores, solo pasan el filtro aquellos elementos que cumplen esta condición. Si no se pasan valores, se obtienen los primeros valores de aquellos elementos que tienen entre el resto de valores algún valor definido.
+        @description Obtener la lista formada por el primer valor de cada uno de los elementos de un enumerable. En caso de Array se obtiene lista de índices, y en caso de Map se obtiene lista de claves. Si se pasan valores, los primeros valores (claves/índices) obtenidos son los de aquellos elementos cuyo resto de valores coincide con los valores pasados en orden; en cuanto se pasan valores, solo pasan el filtro aquellos elementos que cumplen esta condición. Si no se pasan valores, se obtienen los primeros valores de aquellos elementos que tienen entre el resto de valores algún valor definido.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener los primeros valores.
         @param {Integer} numArgs - Número de argumentos que admitirá el enumerable por cada elemento.
