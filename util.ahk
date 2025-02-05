@@ -29,7 +29,7 @@
 
 #Requires AutoHotkey v2.0
 
-/* En lugar del include se llamaría (dentro de Util??) a la función del módulo para ejecutarla, y solo se ejecutaría en teoría una vez si está en la librería */
+; En lugar del include se llamaría (dentro de Util??) a la función del módulo para ejecutarla, y solo se ejecutaría en teoría una vez si está en la librería 
 #Include "error.ahk"
 
 if (!IsSet(__UTIL_H__)) {
@@ -520,119 +520,77 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_ObtenerClaves
         
-        @description Obtener la lista formada por el primer valor de cada uno de los elementos de un enumerable. En caso de Array se obtiene lista de índices, y en caso de Map se obtiene lista de claves. Si se pasan valores, los primeros valores (claves/índices) obtenidos son los de aquellos elementos cuyo resto de valores coincide con los valores pasados en orden; en cuanto se pasan valores, solo pasan el filtro aquellos elementos que cumplen esta condición. Si no se pasan valores, se obtienen los primeros valores de aquellos elementos que tienen entre el resto de valores algún valor definido.
+        @description Obtener una lista de claves de un enumerable. Va recorriendo el enumerable y, para cada elemento, comprueba si los valores de pos_valor coinciden con los valores de las posiciones de los argumentos corespondientes del enumerable. Si coinciden todos, la clave se incluirá en la lista devuelta. Si no se meten valores a comparar, se devuelven las claves con dos condiciones:
+        - Si solo hay un argumento en el enumerable que es la clave, se incluye en la lista de salida si es un valor definido.
+        - Si hay más argumentos además de la clave, solo se incluye la clave si alguno del resto de argumentos es definido. Si todos los demás no están definidos, la clave no se incluye.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener los primeros valores.
         @param {Integer} numArgs - Número de argumentos que admitirá el enumerable por cada elemento.
-        @param {Object} valores - Valores a ser comparados con los de cada elemento del enumerable. El número de valores, si se pasan, debe ser igual a numArgs-1.
+        @param {Integer} posClave - Posición dentro de los argumentos que se considerará la clave de cada elemento.
+        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica, para cada posición de los argumentos del enumerable, el valor que tiene que contener.
 
-        @throws {TypeError} - Si el tipos del argumentos no es correcto.
-        @throws {¿Error?} - Si la función enumerable no admite dos argumentos clave-valor.
+        @throws {Err_TipoArgError} - Si el tipos del argumentos no es correcto.
+        @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
 
         @returns {Array} - Array de claves obtenidas
 
-        @todo Mejorar para admiitir que la clave esté formada por varios valores.
+        @todo Se puede mejorar permitiendo que la clave esté formada por varios valores.
     */
     _Util_ObtenerClaves(enum, numArgs, posClave, pos_valor*) {
         enum := Err_VerificarEnumerable(e, numArgs)
-        if numArgs == 0 ; Si el enum admite 0 args, no hace falta hacer más. No hay error.
-            return []
-
-        valoresRef := Array()
-        Loop numArgs-1
-            valoresRef.Push(Util_CrearVarRef())
-        clave := NULL
-        claves := Array()
-
-        if IsSet(valores) {
-            Err_VerificarArg_Prv(valores, "valores", 3, FuncArg((v) => v.Length <= numArgs-1, FuncArg.TIPO_FUNC["Validar"], "El número de valores debe ser igual al numArgs-1 del enumerable"))
-            valores.Length := numArgs-1
-
-            try
-                while enum(&clave, valoresRef*) {
-                    claveOK := true
-                    for valorRef in valoresRef
-                        if !(!IsSet(%valorRef%) and !IsSet(valores[A_Index]) or (IsSet(%valorRef%) and IsSet(valores[A_Index]) and valores[A_Index] == %valorRef%)) {
-                            claveOK := false
-                            break
-                        }
-                    
-                    if claveOK
-                        claves.Push(clave)
-                }
-            catch as e 
-                throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)    
-        }
-        else {
-            try                 
-                while enum(&clave, valoresRef*) {
-                    claveOK := false
-                    for valorRef in valoresRef
-                        if IsSet(%valorRef%) {
-                            claveOK := true
-                            break
-                        }
-                    
-                    if claveOK
-                        claves.Push(clave)
-                }
-            catch as e 
-                throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)    
-        }
-
-        return claves
-    }
-
-
-
-
-    _Util_ContieneValor(enum, numArgs, pos_valor*) {
-        enum := Err_VerificarEnumerable(enum, numArgs)
-           
-        if Ceil(pos_valor.Length / 2) != numArgs {
-            m := "El número de valores debe ser igual a numArgs del enumerable"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
-        }
-
-        if numArgs == 0
-            return false
+        Err_VerificarArg_Prv(posClave, "posClave", 3, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]), FuncArg((pc) => pc > 0 and pc <= numArgs, FuncArg.TIPO_FUNC["Validar"], "La posición de la clave debe estar entre 1 y numArgs"))
 
         valoresRef := Array()
         Loop numArgs
             valoresRef.Push(Util_CrearVarRef())
+        claves := Array()
 
-        while enum(valoresRef*) {
-            coincide := true
-            Loop pos_valor.Length {
-                posArg := pos_valor[A_Index]
+        if pos_valor.Length > 0 {
+            Err_VerificarArg_Prv(pos_valor, "pos_valor", 4, FuncArg((pv) => Ceil(pv.Length / 2) <= numArgs, FuncArg.TIPO_FUNC["Validar"], "El número de valores debe ser <= numArgs")) 
 
-                if !IsInteger(posArg) {
-                    m := "La posición debe ser un entero"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg, Type(posArg))
+            while enum(valoresRef*) {
+                if !IsSet(%valoresRef[posClave]%)
+                    continue
+
+                valorOK := true
+                Loop pos_valor.Length {
+                    posArg := pos_valor[A_Index]
+                    Err_VerificarArg_Prv(posArg, "pos_valor[" A_Index "]", 3 + A_Index, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]), FuncArg((pa) => pa <= numArgs and pa >= 1, FuncArg.TIPO_FUNC["Validar"], "La posición del valor debe estar entre 1 y numArgs"))
+
+                    if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                        valorOK := false
+                        break
+                    }
                 }
 
-                posArg := Integer(posArg)
-
-                if posArg > numArgs or posArg < 1 {
-                    m := "La posición debe estar entre 1 y numArgs"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg)
-                }
-
-                if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
-                    coincide := false
-                    break
-                }
+                if valorOK
+                    claves.Push(%valoresRef[posClave]%)
             }
+        }
+        else {
+            while enum(valoresRef*) {
+                if !IsSet(%valoresRef[posClave]%)
+                    continue
 
-            if coincide                    
-                return true
+                if numArgs == 1 {
+                    claves.Push(%valoresRef[posClave]%)
+                    continue
+                }
+
+                valorOK := false
+                for valorRef in valoresRef
+                    if A_Index != posClave and IsSet(%valorRef%) {
+                        valorOK := true
+                        break
+                    }
+                
+                if valorOK
+                    claves.Push(%valoresRef[posClave]%)
+            }
         }
 
-        return false
+        return claves
     }
-
-
-
 
 
 
@@ -1098,7 +1056,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
         @param {Integer} numArgs - Número de argumentos >= 1 que admite el enumerable por cada elemento.
-        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica para cada posición de los argumentos del enumerable el valor que tiene que contener.
+        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica, para cada posición de los argumentos del enumerable, el valor que tiene que contener.
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
@@ -1108,8 +1066,8 @@ if (!IsSet(__UTIL_H__)) {
     _Util_ContieneValor(enum, numArgs, pos_valor*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
            
-        if Ceil(pos_valor.Length / 2) != numArgs {
-            m := "El número de valores debe ser igual a numArgs del enumerable"
+        if Ceil(pos_valor.Length / 2) > numArgs {
+            m := "El número de valores debe ser <= numArgs"
             throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
         }
 

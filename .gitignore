@@ -1,4 +1,5 @@
 prueba*.ahk
+.vscode
 *.swp
 
 # Byte-compiled / optimized / DLL files

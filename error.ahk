@@ -446,7 +446,7 @@ if (!IsSet(__ERR_H__))
                 this.ERRORES["DIV0"], Map("nombre", "DIV0", "accion", this.ACCIONES["PARAR_FUNCION"], "mensaje", "División por 0")
             )
         
-            /* Se añaden las propiedades nuevas al prototipo de Err_Error */
+            ; Se añaden las propiedades nuevas al prototipo de Err_Error
 
             S(s) => String(s)
             S.Mensaje := "Debes pasar una cadena o un valor convertible a cadena"
