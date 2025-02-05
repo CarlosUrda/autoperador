@@ -348,7 +348,7 @@ if (!IsSet(__ERR_H__))
         Call(arg) => (this.Funcion)(arg)
 
         Mensaje {
-            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Funcion
+            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . (this.Funcion is Func) ? this.Funcion.Name : ""
 
             set {
                 try

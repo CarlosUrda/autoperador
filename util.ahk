@@ -530,8 +530,10 @@ if (!IsSet(__UTIL_H__)) {
         @throws {¿Error?} - Si la función enumerable no admite dos argumentos clave-valor.
 
         @returns {Array} - Array de claves obtenidas
+
+        @todo Mejorar para admiitir que la clave esté formada por varios valores.
     */
-    _Util_ObtenerClaves(enum, numArgs := 2, valores*) {
+    _Util_ObtenerClaves(enum, numArgs, posClave, pos_valor*) {
         enum := Err_VerificarEnumerable(e, numArgs)
         if numArgs == 0 ; Si el enum admite 0 args, no hace falta hacer más. No hay error.
             return []
@@ -580,6 +582,59 @@ if (!IsSet(__UTIL_H__)) {
 
         return claves
     }
+
+
+
+
+    _Util_ContieneValor(enum, numArgs, pos_valor*) {
+        enum := Err_VerificarEnumerable(enum, numArgs)
+           
+        if Ceil(pos_valor.Length / 2) != numArgs {
+            m := "El número de valores debe ser igual a numArgs del enumerable"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
+        }
+
+        if numArgs == 0
+            return false
+
+        valoresRef := Array()
+        Loop numArgs
+            valoresRef.Push(Util_CrearVarRef())
+
+        while enum(valoresRef*) {
+            coincide := true
+            Loop pos_valor.Length {
+                posArg := pos_valor[A_Index]
+
+                if !IsInteger(posArg) {
+                    m := "La posición debe ser un entero"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg, Type(posArg))
+                }
+
+                posArg := Integer(posArg)
+
+                if posArg > numArgs or posArg < 1 {
+                    m := "La posición debe estar entre 1 y numArgs"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg)
+                }
+
+                if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                    coincide := false
+                    break
+                }
+            }
+
+            if coincide                    
+                return true
+        }
+
+        return false
+    }
+
+
+
+
+
 
     ; Se añade como método a Map y Array
     Map.Prototype.DefineProp("Claves", {Call: (m, v*) => _Util_ObtenerClaves(m, 2, v*)})
@@ -1039,45 +1094,66 @@ if (!IsSet(__UTIL_H__)) {
 
     /*
         @function Util_ContieneValor
-        @description Comprueba si un elemento está dentro de los valores de un objeto enumerable.
+        @description Comprueba si una serie de valores coinciden con valores de algún elemento de un objeto enumerable.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
-        @param {Any} valor - valor a comprobar si está dentro del enum.
         @param {Integer} numArgs - Número de argumentos >= 1 que admite el enumerable por cada elemento.
-        @param {Integer} posValor - Posición de los argumentos del enumerable a comparar el valor.
+        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica para cada posición de los argumentos del enumerable el valor que tiene que contener.
 
         @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
 
         @throws {Err_TipoArgError} - Si el tipo de algún argumento es incorrecto.
         @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
-        @throws {Err_ArgError} - Si el enumerable no es válido o no admite ese número de argumentos.
     */
-    _Util_ContieneValor(enum, numArgs := 2, valores*) {
+    _Util_ContieneValor(enum, numArgs, pos_valor*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
-
-        if valores.Length > numArgs-1 {
-            m := "El número de valores debe ser igual al numArgs-1 del enumerable"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , valores, 3, valores)
+           
+        if Ceil(pos_valor.Length / 2) != numArgs {
+            m := "El número de valores debe ser igual a numArgs del enumerable"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
         }
-        valores.Length := numArgs-1
+
+        if numArgs == 0
+            return false
 
         valoresRef := Array()
         Loop numArgs
             valoresRef.Push(Util_CrearVarRef())
 
-        while enum(valoresRef*)
-            for valorRef in valoresRef
-                if !(!IsSet(%valorRef%) and !IsSet(valores[A_Index]) or (IsSet(%valorRef%) and IsSet(valores[A_Index]) and valores[A_Index] == %valorRef%)) {
-         if IsSet(%valoresRef[posValor]%) and %valoresRef[posValor]% == valor
+        while enum(valoresRef*) {
+            coincide := true
+            Loop pos_valor.Length {
+                posArg := pos_valor[A_Index]
+
+                if !IsInteger(posArg) {
+                    m := "La posición debe ser un entero"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg, Type(posArg))
+                }
+
+                posArg := Integer(posArg)
+
+                if posArg > numArgs or posArg < 1 {
+                    m := "La posición debe estar entre 1 y numArgs"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg)
+                }
+
+                if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                    coincide := false
+                    break
+                }
+            }
+
+            if coincide                    
                 return true
+        }
 
         return false
     }
 
     ; Se añade Util_ContieneValor como método a Map y Array
     Enumerator.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
-    Map.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
-    Array.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
+    Map.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(2, 2, v)})
+    Array.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(1, 1, v)})
     global Util_ContieneValor := _Util_ContieneValor
    
 }
