@@ -347,8 +347,10 @@ if (!IsSet(__ERR_H__))
 
         Call(arg) => (this.Funcion)(arg)
 
+        Nombre => this.Funcion is Func ? this.Funcion.Name : this.Funcion.Call.Name
+
         Mensaje {
-            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . (this.Funcion is Func) ? this.Funcion.Name : ""
+            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Nombre
 
             set {
                 try
@@ -361,7 +363,14 @@ if (!IsSet(__ERR_H__))
         }
 
         CodigoTipoFunc {
-            get => this._codigoTipoFunc
+            get { 
+                if !this.HasProp("_codigoTipoFunc") {
+                    m := "No se ha asignado ningún código de tipo de función"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m)
+                }
+                
+                return this._codigoTipoFunc
+            }
 
             set {
                 if !this.TIPO_FUNC.ContieneValor(value) {
@@ -387,7 +396,14 @@ if (!IsSet(__ERR_H__))
         }
 
         Funcion {
-            get => this._funcion
+            get {
+                if !this.HasProp("_funcion") {
+                    m := "No se ha asignado ninguna función"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m)
+                }
+
+                return this._funcion
+            } 
 
             set {
                 if !_Err_AdmiteNumArgs(value, 1) {
@@ -448,19 +464,16 @@ if (!IsSet(__ERR_H__))
         
             ; Se añaden las propiedades nuevas al prototipo de Err_Error
 
-            S(s) => String(s)
-            S.Mensaje := "Debes pasar una cadena o un valor convertible a cadena"
-            S.TipoError := Err_FuncArgError
-            this.Prototype.DefinePropEstandar("Message", S)
+            this.Prototype.DefinePropEstandar("Message", F := FuncArg(String, FuncArg.TIPO_FUNC["Convertir"]))
             ;this.Prototype.DefinePropEstandar("What", Es_String, , String, true) ; Mejor dejar What como está porque no se sabe muy bien qué formato admite
-            this.Prototype.DefinePropEstandar("Extra", S)
+            this.Prototype.DefinePropEstandar("Extra", F)
 
             Entero(i) => Integer(i)
             Entero.TipoError := Err_FuncArgError
             ValidarCodigo(c) => this.ERRORES.ContieneValor(c)
             ValidarCodigo.Mensaje := "El código de error no está incluido en la lista de códigos"
             ValidarCodigo.TipoError := Err_ValorArgError
-            this.Prototype.DefinePropEstandar("Codigo", Entero, ValidarCodigo)
+            this.Prototype.DefinePropEstandar("Codigo", FuncArg(IsInteger, FuncArgEntero, ValidarCodigo)
 
             ValidarFecha(f) => FormatTime(f) != ""
             ValidarFecha.Mensaje := "La fecha no está en un formato válido YYYYMMDDHH24MISS"

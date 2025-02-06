@@ -222,13 +222,12 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_DefinePropEstandar_Prv
 
-        @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super. Versión Prv PARA SOLO USO INTERNO. YA QUE NO COMPRUEBA NINGUNO DE LOS ARGUMENTOS.
+        @description Definir una propiedad dinámica con sus métodos get y set. La nueva propiedad no tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de ya existir previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super. Versión Prv PARA SOLO USO INTERNO. YA QUE NO COMPRUEBA NINGUNO DE LOS ARGUMENTOS.
         - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
         - Set guardará el valor, aplicando previamente las funciones de verificación.
 
         @param {String} prop - Nombre de la propiedad.
-        @param {Func} funciones - Funciones de verificación usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
-        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión del valor recibido, y lo que devuelva se usará como nuevo valor obtenido. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
+        @param {FuncArg} funciones - Funciones de verificación tipo FuncArg usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido.
 
         @throws {MethodError} - Si existe algún error al definir la propiedad con DefineProp.
 
@@ -267,22 +266,17 @@ if (!IsSet(__UTIL_H__)) {
         - Set guardará el valor, aplicando previamente las funciones de verificación.
 
         @param {String} prop - Nombre de la propiedad.
-        @param {Func} funciones - Funciones de verificación usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido. Cada función tiene que tener obligatoriamente un campo TipoError con un tipo Err_ArgError que será lanzado en caso de que el valor no pase la validación de la función. Puede tener una propiedad opcional Mensaje con el texto que será usado al lanzar el mensaje. 
-        Si el tipo de error asociado es Err_FuncArgError la función se usará como conversión del valor recibido, y lo que devuelva se usará como nuevo valor obtenido. El resto de funciones devolverán true o false si no pasan la validación. Todas las funciones pueden devolver excepciones, en cuyo caso se toma como que no ha pasasdo el filtro de la función.
+        @param {FuncArg} funciones - Funciones de verificación tipo FuncArg usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido.
         
         @throws {Error/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
     _Util_DefinePropEstandarM(obj, prop, funciones*) {
-        prop := Err_VerificarArg_Prv(prop, "prop", 2, , , String)
-
-        FuncOK(f) => _Err_AdmiteNumArgs(f, 1) and f.HasProp("TipoError") and f.TipoError.HasBase(Err_ArgError)
-        FuncOK.Mensaje := "No es una función, no admite un argumento o no tiene propiedad TipoError con un tipo Err_ArgError"
-        FuncOK.TipoError := Err_TipoArgError
+        prop := Err_VerificarArg_Prv(prop, "prop", 2, FuncArg(String, FuncArg.TIPO_FUNC["Convertir"]))
 
         for funcion in funciones {
-            Err_VerificarArg_Prv(funcion, , 2 + A_Index, FuncOK)
+            Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, FuncArg((f) => f is FuncArg, FuncArg.TIPO_FUNC["Comprobar"], "No es una función válida FuncArg"))
 
             /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
@@ -291,10 +285,7 @@ if (!IsSet(__UTIL_H__)) {
     }
 
     _Util_DefinePropEstandar(obj, prop, funciones*) {
-        ObjOK(o) => o is Object
-        ObjOK.Mensaje := "Debes pasar un Object para definir la nueva propiedad"
-        ObjOK.TipoError := Err_TipoArgError
-        Err_VerificarArg_Prv(obj, "obj", 1, ObjOK)
+        Err_VerificarArg_Prv(obj, "obj", 1, FuncArg((o) => o is Object, FuncArg.TIPO_FUNC["Comprobar"], "Debes pasar un objeto Object para definir la nueva propiedad"))
 
         return obj.DefinePropEstandar(prop, funciones*)
     }
@@ -521,7 +512,7 @@ if (!IsSet(__UTIL_H__)) {
         @function Util_ObtenerClaves
         
         @description Obtener una lista de claves de un enumerable. Va recorriendo el enumerable y, para cada elemento, comprueba si los valores de pos_valor coinciden con los valores de las posiciones de los argumentos corespondientes del enumerable. Si coinciden todos, la clave se incluirá en la lista devuelta. Si no se meten valores a comparar, se devuelven las claves con dos condiciones:
-        - Si solo hay un argumento en el enumerable que es la clave, se incluye en la lista de salida si es un valor definido.
+        - Si solo hay un argumento en el enumerable, y éste es la clave, se incluye en la lista de salida si es un valor definido.
         - Si hay más argumentos además de la clave, solo se incluye la clave si alguno del resto de argumentos es definido. Si todos los demás no están definidos, la clave no se incluye.
 
         @param {Enumerator|Object<__Enum>} enum - Objeto enumerable de donde obtener los primeros valores.
@@ -537,7 +528,7 @@ if (!IsSet(__UTIL_H__)) {
         @todo Se puede mejorar permitiendo que la clave esté formada por varios valores.
     */
     _Util_ObtenerClaves(enum, numArgs, posClave, pos_valor*) {
-        enum := Err_VerificarEnumerable(e, numArgs)
+        enum := Err_VerificarEnumerable(enum, numArgs)
         Err_VerificarArg_Prv(posClave, "posClave", 3, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]), FuncArg((pc) => pc > 0 and pc <= numArgs, FuncArg.TIPO_FUNC["Validar"], "La posición de la clave debe estar entre 1 y numArgs"))
 
         valoresRef := Array()
@@ -567,15 +558,10 @@ if (!IsSet(__UTIL_H__)) {
                     claves.Push(%valoresRef[posClave]%)
             }
         }
-        else {
+        else if numArgs > 1 {
             while enum(valoresRef*) {
                 if !IsSet(%valoresRef[posClave]%)
                     continue
-
-                if numArgs == 1 {
-                    claves.Push(%valoresRef[posClave]%)
-                    continue
-                }
 
                 valorOK := false
                 for valorRef in valoresRef
@@ -587,16 +573,18 @@ if (!IsSet(__UTIL_H__)) {
                 if valorOK
                     claves.Push(%valoresRef[posClave]%)
             }
-        }
+        } 
+        else
+            while enum(valoresRef*)
+                if !IsSet(%valoresRef[posClave]%)
+                    claves.Push(%valoresRef[posClave]%)
 
         return claves
     }
 
-
-
     ; Se añade como método a Map y Array
-    Map.Prototype.DefineProp("Claves", {Call: (m, v*) => _Util_ObtenerClaves(m, 2, v*)})
-    Array.Prototype.DefineProp("IndicesConValor", {Call: (a, v*) => _Util_ObtenerClaves(a, 2, v*)})
+    Map.Prototype.DefineProp("Claves", {Call: (m, v*) => _Util_ObtenerClaves(m, 1, 1, v*)})
+    Array.Prototype.DefineProp("IndicesConValor", {Call: (a, v*) => _Util_ObtenerClaves(a, 2, 1, v*)})
     Enumerator.Prototype.DefineProp("Claves", {Call: _Util_ObtenerClaves})
     global Util_ObtenerClaves := _Util_ObtenerClaves
 
