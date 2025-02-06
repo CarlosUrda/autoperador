@@ -9,6 +9,7 @@
         - Hacer ToString en las nuevas clases.
         - Cambiar las llamadas a Err_Lanzar venga de capturar una expeción para relanzarla. Si además capturo una excepción que he lanzado yo desde mi código no hace falta volver a meter el código de error como argumento.
         - Hace un módulo de testing por cada librería, donde se pruebe cada función.
+        - Aunque se verifica el enumerable en las funciones que reciben uno, y al recorrerlo tiene que recibir el número de argumentos correcto y por referencia, no se comprueba que, por lo que sea, dentro de la ejecución de cada iteración del enumerable se cometa un fallo. Digamos que verificarEnumerable comrpueba que está todo bien hasta que se entra dentro del enumerable en la ejecución de cada iteración. Si se termina comprobando esto, se debe propagar un error Err_EnumerableError.
 
         Pasos:
         - Modificar los Err_ArgError con la nueva modificación.
@@ -55,9 +56,9 @@ if (!IsSet(__UTIL_H__)) {
             clase := %Type(valor)%
 
         if !IsSet(clase) or !(clase is Class)
-            throw Err_Error.ExtenderErr(TypeError("El tipo del valor no es una Clase"))
+            throw Err_TipoArgError("El tipo del valor no es una Clase", , , , , , "valor", 1, valor, Type(valor))
         if clase.Prototype != valor.Base
-            throw Err_Error.ExtenderErr(TypeError("El prototipo de la clase tipo no coincide con la base prototipo del valor. Es decir, el objeto no se creó a partir del prototipo del tipo clase."))
+            throw Err_TipoArgError("El prototipo del tipo de valor no coincide con la base prototipo del valor. Es decir, el objeto no se creó a partir del prototipo de su tipo", , , , , , "valor", 1, valor, Type(valor))
 
         return clase
     }
@@ -76,7 +77,7 @@ if (!IsSet(__UTIL_H__)) {
         @returns {Array} - Lista con los valores
     */
     Util_CrearLista(numElementos, asc := true) {
-        numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, IsInteger, (n) => n >= 0, Integer)
+        numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, Err_FA_EsEntero, Err_FA_Entero, Err_FA_EsPositivo)
 
         lista := []
         if !asc {
@@ -101,12 +102,12 @@ if (!IsSet(__UTIL_H__)) {
         @description Saber si un objeto clase es descendiente o heredero.
     */
     _Util_EsDescendienteM(clase, descendiente) {
-        Err_VerificarArg_Prv(descendiente, "descendiente", 2, Es_Clase(o) => o is Class)
+        Err_VerificarArg_Prv(descendiente, "descendiente", 2, Err_FA_EsClase)
         return descendiente.HasBase(clase)
     }
 
     _Util_EsDescendiente(clase, descendiente) {
-        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)      
+        Err_VerificarArg_Prv(clase, "clase", 1, Err_FA_EsClase)
         return clase.EsDescendiente(descendiente)
     }
 
@@ -152,7 +153,7 @@ if (!IsSet(__UTIL_H__)) {
             return clase
 
         if baseRaiz != clase.Base {
-            Err_VerificarArg_Prv(baseRaiz, "baseRaiz", 3, Es_Clase(o) => o is Class)
+            Err_VerificarArg_Prv(baseRaiz, "baseRaiz", 3, Err_FA_EsClase)
 
             Loop { ; Loop en lugar de while para aprovechar la comparación anterior necesaria.
                 if clase.Base == baseNueva
@@ -171,7 +172,7 @@ if (!IsSet(__UTIL_H__)) {
     }
     
     _Util_CambiarBase(clase, baseNueva, baseRaiz?) {
-        Err_VerificarArg_Prv(clase, "clase", 1, Es_Clase(o) => o is Class)
+        Err_VerificarArg_Prv(clase, "clase", 1, Err_FA_EsClase)
         
         return clase.CambiarBase(baseNueva, baseRaiz?)
     }
@@ -273,10 +274,10 @@ if (!IsSet(__UTIL_H__)) {
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
     _Util_DefinePropEstandarM(obj, prop, funciones*) {
-        prop := Err_VerificarArg_Prv(prop, "prop", 2, FuncArg(String, FuncArg.TIPO_FUNC["Convertir"]))
+        prop := Err_VerificarArg_Prv(prop, "prop", 2, Err_FA_Cadena)
 
         for funcion in funciones {
-            Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, FuncArg((f) => f is FuncArg, FuncArg.TIPO_FUNC["Comprobar"], "No es una función válida FuncArg"))
+            Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, Err_FA_EsFuncArg)
 
             /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
@@ -303,15 +304,13 @@ if (!IsSet(__UTIL_H__)) {
         @param {Func} funcion - Función a ser envuelta y que recibirá en orden los argumentos que pasan el filtro.
         @param {Func} filtro - Función que recibirá como argumentos la posición y el valor de cada argumento de la función envoltorio. Si devuelve true, el argumento se pasará a la función; si devuelve false, se desecha. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
 
-        @throws {TypeError} - Si los tipos de los argumentos son erróneos.
+        @throws {Err_FuncArgError} - Si ocurre un error al ejecutar el filtro
         @throws {ErrorNumArgumentos} - Si la función no admite el número de argumentos pasados tras el filtro..
 
         @returns {Func} - Función envoltorio que será la que reciba los argumentos a ser filtrados.
     */
     _Util_FiltrarArgsM(funcion, filtro) {
-        Ff(f) => Err_AdmiteNumArgs(f, 2)
-        Ff.Mensaje := "No es una función o no admite 2 argumentos pos, valor"
-        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Err_FA_Admite2Args)
 
         _Funcion(args*) {            
             _args := args
@@ -320,7 +319,7 @@ if (!IsSet(__UTIL_H__)) {
                     if !filtro(A_index, arg?)
                         _args.RemoveAt(A_Index)
                 catch as e
-                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+                    throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
             try 
                 return funcion(_args*)
@@ -332,7 +331,7 @@ if (!IsSet(__UTIL_H__)) {
     }
 
     _Util_FiltrarArgs(funcion, filtro) {
-        Err_VerificarArg_Prv(funcion, "funcion", 1, EsFunc(f) => f is Func)
+        Err_VerificarArg_Prv(funcion, "funcion", 1, Err_FA_EsLlamable)
 
         return _Util_FiltrarArgsM(funcion, filtro)
     }
@@ -357,9 +356,7 @@ if (!IsSet(__UTIL_H__)) {
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
     _Util_SubListaM(lista, filtro) {
-        Ff(f) => Err_AdmiteNumArgs(f, 2)
-        Ff.Mensaje := "No es una función o no admite 2 argumentos índice, valor"
-        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Err_FA_Admite2Args)
 
         enum := Err_VerificarEnumerable(lista, 2)
         borrables := []
@@ -368,7 +365,7 @@ if (!IsSet(__UTIL_H__)) {
                 if !filtro(i, valor?)
                     borrables.Push(i)
             catch as e
-                throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+                throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
         i := -1
         Loop borrables.Length
@@ -395,9 +392,7 @@ if (!IsSet(__UTIL_H__)) {
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
     _Util_SubDiccM(dicc, filtro) {
-        Ff(f) => Err_AdmiteNumArgs(f, 2)
-        Ff.Mensaje := "No es una función o no admite 2 argumentos clave, valor"
-        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Err_FA_Admite2Args)
         enum := Err_VerificarEnumerable(dicc, 2)
 
         borrables := []
@@ -406,7 +401,7 @@ if (!IsSet(__UTIL_H__)) {
                 if !filtro(clave, valor)
                     borrables.Push(clave)
             catch as e
-                throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
+                throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
         for clave in borrables
             dicc.Delete(clave)
@@ -431,10 +426,7 @@ if (!IsSet(__UTIL_H__)) {
         @return {Array} - Lista de elementos del enumerable que han pasado un filtro. Si cada elemento está formado por varios valores (tantos como numArgs), devuelve un array de arrays.
     */
     Util_SubEnumerable(enum, numArgs, filtro) {
-        Ff(f) => Err_AdmiteNumArgs(f, numArgs)
-        Ff.Mensaje := "No es una función o no admite numArgs"
-        Err_VerificarArg_Prv(filtro, "filtro", 2, Ff)
-
+        Err_VerificarArg_Prv(filtro, "filtro", 2, Err_FA_Admite2Args)
         enum := Err_VerificarEnumerable(enum, numArgs)
 
         resultado := Array()
@@ -442,20 +434,17 @@ if (!IsSet(__UTIL_H__)) {
         Loop numArgs
             valoresRef.Push(Util_CrearVarRef())
 
-        try
-            while enum(valoresRef*) {
-                valores := Array()
-                for valorRef in valoresRef
-                    valores.Push(%valorRef%?)
+        while enum(valoresRef*) {
+            valores := Array()
+            for valorRef in valoresRef
+                valores.Push(%valorRef%?)
 
-                try
-                    if filtro(valores*)
-                        resultado.Push(Array(valores*))
-                catch as e
-                    throw Err_FuncError("Filtro no ejecutado correctamente", , , , , e, filtro)
-            }
-        catch as e 
-            throw Err_FuncError("Fallo al recorrer el enumerable", , , , , e, enum)
+            try
+                if filtro(valores*)
+                    resultado.Push(Array(valores*))
+            catch as e
+                throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
+        }
 
         return resultado
     }
@@ -478,25 +467,20 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_EnumerableACadenaM(enum, numArgs := 1, sepGrupo := ";", sepPartes := ":") {
         enum := Err_VerificarEnumerable(e, numArgs)
-        S(s) => String(s)
-        S.Mensaje := "Los separadores deben de ser una cadena",
-        sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, , , S)
-        sepPartes := Err_VerificarArg_Prv(sepPartes, "sepPartes", 4, , , S)
+        sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, Err_FA_Cadena)
+        sepPartes := Err_VerificarArg_Prv(sepPartes, "sepPartes", 4, Err_FA_Cadena)
 
         valoresRef := Array()
         Loop numArgs
             valoresRef.Push(Util_CrearVarRef())
 
         cadena := ""
-        try
-            while enum(valoresRef*) {
-                for valorRef in valoresRef
-                    cadena .= (%valorRef% ?? "") sepPartes " "
+        while enum(valoresRef*) {
+            for valorRef in valoresRef
+                cadena .= (%valorRef% ?? "") sepPartes " "
 
-                cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
-            }
-        catch as e 
-            throw Err_FuncError("Fallo al recorrer el numerable", , , , , e, enum)
+            cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
+        }
 
         return RTrim(cadena, sepGrupo " ")
     }
@@ -529,7 +513,8 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_ObtenerClaves(enum, numArgs, posClave, pos_valor*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
-        Err_VerificarArg_Prv(posClave, "posClave", 3, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]), FuncArg((pc) => pc > 0 and pc <= numArgs, FuncArg.TIPO_FUNC["Validar"], "La posición de la clave debe estar entre 1 y numArgs"))
+        FA_RangoPosicion := FuncArg((p) => p > 0 and p <= numArgs, FuncArg.TIPO_FUNC["Validar"], "La posición debe estar entre 1 y numArgs")
+        posClave := Err_VerificarArg_Prv(posClave, "posClave", 3, Err_FA_EsEntero, Err_FA_Entero, FA_RangoPosicion)
 
         valoresRef := Array()
         Loop numArgs
@@ -540,15 +525,14 @@ if (!IsSet(__UTIL_H__)) {
             Err_VerificarArg_Prv(pos_valor, "pos_valor", 4, FuncArg((pv) => Ceil(pv.Length / 2) <= numArgs, FuncArg.TIPO_FUNC["Validar"], "El número de valores debe ser <= numArgs")) 
 
             while enum(valoresRef*) {
-                if !IsSet(%valoresRef[posClave]%)
+                if !IsSetRef(valoresRef[posClave])
                     continue
 
                 valorOK := true
                 Loop pos_valor.Length {
-                    posArg := pos_valor[A_Index]
-                    Err_VerificarArg_Prv(posArg, "pos_valor[" A_Index "]", 3 + A_Index, FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"]), FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"]), FuncArg((pa) => pa <= numArgs and pa >= 1, FuncArg.TIPO_FUNC["Validar"], "La posición del valor debe estar entre 1 y numArgs"))
+                    posArg := Err_VerificarArg_Prv(pos_valor[A_Index], "pos_valor[" A_Index "]", 3 + A_Index, Err_FA_EsEntero, Err_FA_Entero, FA_RangoPosicion)
 
-                    if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                    if !((!IsSetRef(valoresRef[posArg]) and !pos_valor.Has(++A_Index)) or (IsSetRef(valoresRef[posArg]) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
                         valorOK := false
                         break
                     }
@@ -560,12 +544,12 @@ if (!IsSet(__UTIL_H__)) {
         }
         else if numArgs > 1 {
             while enum(valoresRef*) {
-                if !IsSet(%valoresRef[posClave]%)
+                if !IsSetRef(valoresRef[posClave])
                     continue
 
                 valorOK := false
                 for valorRef in valoresRef
-                    if A_Index != posClave and IsSet(%valorRef%) {
+                    if A_Index != posClave and IsSetRef(valorRef) {
                         valorOK := true
                         break
                     }
@@ -576,7 +560,7 @@ if (!IsSet(__UTIL_H__)) {
         } 
         else
             while enum(valoresRef*)
-                if !IsSet(%valoresRef[posClave]%)
+                if !IsSetRef(valoresRef[posClave])
                     claves.Push(%valoresRef[posClave]%)
 
         return claves
@@ -626,12 +610,8 @@ if (!IsSet(__UTIL_H__)) {
         @param {Integer} fin - Posición del último elemento de la sublista.
     */
     _Util_OrdenarListaM(lista, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
-        Vi(i) => inicio >= 1 and fin >= inicio
-        Vi.Mensaje := "Los indices tienen que cumplir 1 <= inicio <= fin"
-        Vi.TipoError := Err_ValorArgError
-        Integer.TipoError := Err_FuncArgError
-        inicio := Err_VerificarArg_Prv(inicio, "inicio", 4, Integer)
-        fin := Err_VerificarArg_Prv(fin, "fin", 5, Integer, Vi)
+        inicio := Err_VerificarArg_Prv(inicio, "inicio", 4, Err_FA_EsEntero, Err_FA_Entero)
+        fin := Err_VerificarArg_Prv(fin, "fin", 5, Err_FA_EsEntero, Err_FA_Entero, FuncArg((i) => inicio >= 1 and fin >= inicio, FuncArg.TIPO_FUNC["Validar"], "Los indices tienen que cumplir 1 <= inicio <= fin"))
 
         if lista.Length == 0 or (fin - inicio) <= 0
             return
@@ -751,7 +731,7 @@ if (!IsSet(__UTIL_H__)) {
             @description Convertir un objeto Map a MapOrden. El objeto pasado queda modificado pasando a ser de tipo MapOrden
 
             @param {Map} dicc - Diccionario Map a ser convertido.
-            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación.
+            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación. Si no se pasa función de comparación, el orden de los elementos es el orden en que se van introduciendo.
 
             @throws {Err_TipoArgError} - Si dicc no es Map o comparar no es Func.
             @throws {Err_FuncError} - Si no puede ordenar las claves.
@@ -765,6 +745,7 @@ if (!IsSet(__UTIL_H__)) {
             dicc.Base := this.Prototype
             dicc._claves := dicc.Claves()
             if IsSet(comparar) {
+                ; Aquí No hay que preocuparse por meterlos en orden
                 try
                     dicc.Comparar := comparar
                 catch as e {
@@ -1083,7 +1064,7 @@ if (!IsSet(__UTIL_H__)) {
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg)
                 }
 
-                if !((!IsSet(%valoresRef[posArg]%) and !pos_valor.Has(++A_Index)) or (IsSet(%valoresRef[posArg]%) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                if !((!IsSetRef(valoresRef[posArg]) and !pos_valor.Has(++A_Index)) or (IsSetRef(valoresRef[posArg]) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
                     coincide := false
                     break
                 }

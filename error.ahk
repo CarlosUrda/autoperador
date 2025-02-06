@@ -318,8 +318,19 @@ if (!IsSet(__ERR_H__))
 
 
 
-    /*** TIPOS DE DATOS PARA COMPROBACIÓN DE ERRORES ***/
-    
+    /*** TIPOS DE DATOS Y FUNCIONES PARA COMPROBACIÓN DE ERRORES EN ARGUMENTOS ***/
+
+    ; Objetos FuncArg genéricos
+    Err_FA_Cadena := FuncArg(String, FuncArg.TIPO_FUNC["Convertir"], "No se puede convertir a una cadena (String)")
+    Err_FA_Entero := FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"], "No se puede convertir a un entero (Integer)")
+    Err_FA_EsEntero := FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"], "No es un entero sin decimales")
+    Err_FA_FechaValida := FuncArg((f) => FormatTime(f) != "", FuncArg.TIPO_FUNC["Validar"], "La fecha no está en un formato válido YYYYMMDDHH24MISS")
+    Err_FA_EsError := FuncArg((e) => e is Error, FuncArg.TIPO_FUNC["Comprobar"], "La excepción tiene que ser tipo Error")
+    Err_FA_EsClase := FuncArg((o) => o is Class, FuncArg.TIPO_FUNC["Comprobar"], "El objeto no es una clase (Class)")
+    Err_FA_EsPositivo := FuncArg((n) => n >= 0, FuncArg.TIPO_FUNC["Validar"], "El valor debe ser >= 0")
+    Err_FA_EsFuncArg := FuncArg((f) => f is FuncArg, FuncArg.TIPO_FUNC["Comprobar"], "No es una función válida de tipo FuncArg")
+    Err_FA_EsLlamable := FuncArg(Err_EsLlamable, FuncArg.TIPO_FUNC["Comprobar"], "Tiene que ser una función o un objeto llamable")
+    Err_FA_Admite2Args := FuncArg((f) => Err_AdmiteNumArgs(f, 2), FuncArg.TIPO_FUNC["Comprobar"], "No es una función o no admite 2 argumentos índice, valor")
     /*
         @class FuncArg
 
@@ -350,7 +361,16 @@ if (!IsSet(__ERR_H__))
         Nombre => this.Funcion is Func ? this.Funcion.Name : this.Funcion.Call.Name
 
         Mensaje {
-            get => this.HasProp("_mensaje") ? this._mensaje : FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Nombre
+            get { 
+                try
+                    return this._mensaje
+                try
+                    return FuncArg._MENSAJES[this.CodigoTipoFunc] . this.Nombre
+                catch as e {
+                    m := "No se ha asignado ningún mensaje ni se puede obtener por defecto"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m, , , , , e)
+                }
+            }
 
             set {
                 try
@@ -364,16 +384,16 @@ if (!IsSet(__ERR_H__))
 
         CodigoTipoFunc {
             get { 
-                if !this.HasProp("_codigoTipoFunc") {
+                try
+                    return this._codigoTipoFunc
+                catch as e {
                     m := "No se ha asignado ningún código de tipo de función"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m)
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m, , , , , e)
                 }
-                
-                return this._codigoTipoFunc
             }
 
             set {
-                if !this.TIPO_FUNC.ContieneValor(value) {
+                if !IsInteger(value) or !this.TIPO_FUNC.ContieneValor(value) {
                     m := "El código del tipo de función no es válido"
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "CodigoTipoFunc", 1, value)
                 }
@@ -383,7 +403,16 @@ if (!IsSet(__ERR_H__))
         }
 
         TipoError {
-            get => this.HasProp("_tipoError") ? this._tipoError : FuncArg._TIPO_ERROR[this.CodigoTipoFunc]
+            get { 
+                try
+                    return this._tipoError
+                try
+                    return FuncArg._TIPO_ERROR[this.CodigoTipoFunc]
+                catch as e {
+                    m := "No se ha asignado ningún tipo de error o no se puede obtener por defecto"
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m, , , , , e)
+                }
+            }
 
             set {
                 if !(value is Class) or (value != Err_ArgError and !value.HasBase(Err_ArgError)) {
@@ -397,12 +426,12 @@ if (!IsSet(__ERR_H__))
 
         Funcion {
             get {
-                if !this.HasProp("_funcion") {
+                try
+                    return this._funcion
+                catch as e {
                     m := "No se ha asignado ninguna función"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m)
+                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : PropertyError.CrearErrorAHK(m, , , , , e)
                 }
-
-                return this._funcion
             } 
 
             set {
@@ -464,26 +493,12 @@ if (!IsSet(__ERR_H__))
         
             ; Se añaden las propiedades nuevas al prototipo de Err_Error
 
-            this.Prototype.DefinePropEstandar("Message", F := FuncArg(String, FuncArg.TIPO_FUNC["Convertir"]))
+            this.Prototype.DefinePropEstandar("Message", Err_FA_Cadena)
             ;this.Prototype.DefinePropEstandar("What", Es_String, , String, true) ; Mejor dejar What como está porque no se sabe muy bien qué formato admite
-            this.Prototype.DefinePropEstandar("Extra", F)
-
-            Entero(i) => Integer(i)
-            Entero.TipoError := Err_FuncArgError
-            ValidarCodigo(c) => this.ERRORES.ContieneValor(c)
-            ValidarCodigo.Mensaje := "El código de error no está incluido en la lista de códigos"
-            ValidarCodigo.TipoError := Err_ValorArgError
-            this.Prototype.DefinePropEstandar("Codigo", FuncArg(IsInteger, FuncArgEntero, ValidarCodigo)
-
-            ValidarFecha(f) => FormatTime(f) != ""
-            ValidarFecha.Mensaje := "La fecha no está en un formato válido YYYYMMDDHH24MISS"
-            ValidarFecha.TipoError := Err_ValorArgError
-            this.Prototype.DefinePropEstandar("Fecha", ValidarFecha, S)
-
-            ComprobarError(e) => e is Error
-            ComprobarError.Mensaje := "La excepción previa tiene que ser tipo Error"
-            ComprobarError.TipoError := Err_TipoArgError
-            this.Prototype.DefinePropEstandar("ErrorPrevio", ComprobarError)
+            this.Prototype.DefinePropEstandar("Extra", Err_FA_Cadena)
+            this.Prototype.DefinePropEstandar("Codigo", Err_FA_EsEntero, Err_FA_Entero, FuncArg((c) => this.ERRORES.ContieneValor(c), FuncArg.TIPO_FUNC["Validar"], "El código de error no está incluido en la lista de códigos"))
+            this.Prototype.DefinePropEstandar("Fecha", Err_FA_FechaValida)
+            this.Prototype.DefinePropEstandar("ErrorPrevio", Err_FA_EsError)
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -519,14 +534,16 @@ if (!IsSet(__ERR_H__))
             @description Convertir la información de la excepción a una cadena String (no se muestra la pila Stack)
 
             @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
+
+            @notas En este caso Err_ErroresPersonalizadosActivo no es necesario porque Err_FA_Cadena ya está creado, pero si hubiese que crear un FuncArg, el cual puede lanzar un Err_Error, habría que activarlo. Aunque si ocurriese esto, y FuncArg lanza un Err_Error aquí dentro, el error lanzado no tendría que entrar a ToString, y como la creación de un Err_Error ya está controlado mediante flags, no generaría ningún bucle.
         */
         ToString(texto?) {
-            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
+            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, Err_FA_Cadena) : ""
     
             texto := "[" FormatTime(this.Fecha, "dd/MM/yyyy HH:mm:ss] (") String(this.Codigo) ") " String(this.Message) ". " String(this.Extra) . texto "'r'n"
             try
                 texto .= "Previo => " this.ErrorPrevio "'r'n"
-            
+
             return texto
         }
     }
@@ -573,13 +590,10 @@ if (!IsSet(__ERR_H__))
         static CrearErrorAHK(mensaje?, what := ERR_FUNCION_ORIGEN["LLAMANTE"], extra?, codigo?, fecha := A_Now, errorPrevio?) {
             Err_ErroresPersonalizadosActivo := false
 
-            ComprobarTipo(e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK)
-            ComprobarTipo.Mensaje := "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"
-            ComprobarTipo.TipoError := Err_TipoArgError
-            tipoErrorAHK := Err_VerificarArg_Prv(this, "this", 0, ComprobarTipo)
+            Err_VerificarArg_Prv(this, "this", 0, FuncArg((e) => e != Err_ErrorAHK and e.HasBase(Err_ErrorAHK), FuncArg.TIPO_FUNC["Comprobar"], "CrearError solo se puede usar desde los tipos de error predefinidos AHK herederos de Err_Error"))
 
-            excepcion := tipoErrorAHK(mensaje?, what, extra?)
-            excepcion.Codigo := codigo ?? this._ERRORES_AHK[tipoErrorAHK].codigo
+            excepcion := this(mensaje?, what, extra?)
+            excepcion.Codigo := codigo ?? this._ERRORES_AHK[this].codigo
             excepcion.Fecha := fecha
             if IsSet(errorPrevio)
                 excepcion.ErrorPrevio := errorPrevio
@@ -608,18 +622,8 @@ if (!IsSet(__ERR_H__))
         static __New() {
             Err_ErroresPersonalizadosActivo := false
 
-            VP(i) => i >= 0
-            VP.Mensaje := "La posición del argumento debe ser entero >= 0 (0 para this)"
-            VP.TipoError := Err_ValorArgError
-            Entero(i) => Integer(i)
-            Entero.TipoError := Err_FuncArgError
-            this.Prototype.DefinePropEstandar("PosArg", Entero, VP)
-
-            S(s) => String(s)
-            S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
-            S.TipoError := Err_FuncArgError
-            this.Prototype.DefinePropEstandar("NombreArg", S)
-
+            this.Prototype.DefinePropEstandar("PosArg", Err_FA_EsEntero, Err_FA_Entero, Err_FA_EsPositivo)
+            this.Prototype.DefinePropEstandar("NombreArg", Err_FA_Cadena)
             this.Prototype.DefinePropEstandar("ValorArg")
 
             Err_ErroresPersonalizadosActivo := true
@@ -664,7 +668,7 @@ if (!IsSet(__ERR_H__))
             @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
-            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
+            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, Err_FA_Cadena) : ""
 
             _texto := ". NombreArg: "
             try
@@ -694,12 +698,7 @@ if (!IsSet(__ERR_H__))
         static __New() {
             Err_ErroresPersonalizadosActivo := false
 
-            S(s) => String(s)
-            S.Mensaje := "El nombre de argumento debe ser una cadena o convertible a cadena"
-            S.TipoError := Err_FuncArgError
-            EsClase(s) => %String(s)% is Class
-            EsClase.Mensaje := "La cadena tipo de dato no representa ninguna Clase"
-            this.Prototype.DefinePropEstandar("TipoArg", Err_Cadena, Err_Clase)
+            this.Prototype.DefinePropEstandar("TipoArg", Err_FA_Cadena, FuncArg((s) => %String(s)% is Class, FuncArg.TIPO_FUNC["Comprobar"], "La cadena del tipo de dato no representa ninguna Clase"))
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -736,7 +735,7 @@ if (!IsSet(__ERR_H__))
             @param {String} texto - Cadena a añadir al mensaje antes de los errores previos.
         */
         ToString(texto?) {
-            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, , , String) : ""
+            texto := IsSet(texto) ? ". " Err_VerificarArg_Prv(texto, "texto", 1, Err_FA_Cadena) : ""
             try
                 _texto := ". NombreArg: " this.TipoArg
 
@@ -765,10 +764,8 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["VALOR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
-            super.__New(mensaje, what, extra, codigo, fecha, nombreArg, posArg)
-            if IsSet(valorArg)
-                this.ValorArg := valorArg           
+        __New(mensaje, what?, extra?, codigo := Err_Error.ERRORES["VALOR_ARG"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?) {
+            super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?)
         }
 
         /*
@@ -790,9 +787,7 @@ if (!IsSet(__ERR_H__))
         static __New() {
             Err_ErroresPersonalizadosActivo := false
 
-            EsFunc(f) => f is Func
-            EsFunc.Mensaje := "No has pasado una función relacionada con el error"
-            this.Prototype.DefinePropEstandar("Funcion", EsFunc)
+            this.Prototype.DefinePropEstandar("Funcion", Err_FA_EsLlamable)
 
             Err_ErroresPersonalizadosActivo := true
         }
@@ -812,8 +807,8 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["FUNCION"], fecha?, errorPrevio?, funcion?) {
-            super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?)
+        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["FUNCION"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?, funcion?) {
+            super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?)
 
             Err_ErroresPersonalizadosActivo := false
             
