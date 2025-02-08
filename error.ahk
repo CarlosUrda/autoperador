@@ -257,30 +257,29 @@ if (!IsSet(__ERR_H__))
 
         @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
-    _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*) {
+    _Err_VerificarArg_Prv(valorArg?, nombreArg?, posArg?, funciones*) {
         for funcion in funciones {
             if funcion.CodigoTipoFunc == FuncArg.TIPO_FUNC["Convertir"] {
                 try
-                    valorArg := funcion(valorArg)
+                    valorArg := funcion(valorArg?)
                 catch as e
                     esCorrecto := false
             }
             else {
                 try
-                    esCorrecto := funcion(valorArg) 
+                    esCorrecto := funcion(valorArg?) 
                 catch as e
                     esCorrecto := false
             }
 
             if IsSet(esCorrecto) and !esCorrecto {
+                argsExtra := []
                 switch funcion.TipoError {
                     case Err_TipoArgError:
-                        argsExtra := [Type(valorArg)]
-                    default:
-                        argsExtra := []              
+                        argsExtra.Push(IsSet(valorArg) ? Type(valorArg) : valorArg?)
                 }
 
-                throw !Err_ErroresPersonalizadosActivo ? Error(funcion.Mensaje) : funcion.TipoError(funcion.Mensaje, , , , , e?, nombreArg?, posArg?, valorArg, argsExtra*)
+                throw !Err_ErroresPersonalizadosActivo ? Error(funcion.Mensaje) : funcion.TipoError(funcion.Mensaje, , , , , e?, nombreArg?, posArg?, valorArg?, argsExtra*)
             }
         }
 
@@ -304,7 +303,7 @@ if (!IsSet(__ERR_H__))
 
         @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
-    _Err_VerificarArg(valorArg, nombreArg?, posArg?, funciones*) {
+    _Err_VerificarArg(valorArg?, nombreArg?, posArg?, funciones*) {
         ; nombreArg y posArg solo sirven de información a ser incluida en el error lanzado en caso de fallo en la verificación. Ambos ya se comprueban en el único sitio donde se usan: constructor del Error a lanzar si falla la verificación.
 
         for funcion in funciones {
@@ -313,7 +312,7 @@ if (!IsSet(__ERR_H__))
             /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
 
-        return _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*)
+        return _Err_VerificarArg_Prv(valorArg?, nombreArg?, posArg?, funciones*)
     }
 
     global Err_VerificarArg := _Err_VerificarArg

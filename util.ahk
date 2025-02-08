@@ -359,22 +359,20 @@ if (!IsSet(__UTIL_H__)) {
         Err_VerificarArg_Prv(filtro, "filtro", 2, FuncArg.Admite2Args)
         ; enum := Err_VerificarEnumerable(lista, 2)
 
-        borrables := []
-        for i, valor in lista
-            try 
-                if !filtro(i, valor?)
-                    borrables.Push(i)
+        indice := lista.Lenght + indice + 1
+        Loop lista.Length {
+            try
+                if !filtro(indice, lista[indice]?)
+                    lista.RemoveAt(indice)              
             catch as e
                 throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
-        i := -1
-        Loop borrables.Length
-            lista.RemoveAt(borrables[i--])
-
+            indice--
+        }
     }
     
     ; Se añade como método a Array
-    Array.Prototype.DefineProp("SubLista", {Call: _Util_SubListaM})
+    Array.Prototype.DefineProp("Sub", {Call: _Util_SubListaM})
 
 
 
@@ -408,18 +406,18 @@ if (!IsSet(__UTIL_H__)) {
     }
     
     ; Se añade como método a Map
-    Map.Prototype.DefineProp("SubDicc", {Call: _Util_SubDiccM})
+    Map.Prototype.DefineProp("Sub", {Call: _Util_SubDiccM})
 
         
     /*
-        @function Util_SubEnumerable
+        @function Util_SubEnumerableM
 
-        @description Obtener un array con los elementos de un enumerable que pasan un filtro. Si el enumerable admite varios argumentos, cada elemento dentro de la lista resultante será un array con los valores de cada elemento del enumerable.
+        @description Obtener un array con los elementos de un enumerable que pasan un filtro. Si el enumrable admite varios argumentos, cada elemento dentro de la lista resultante será un array con los valores de cada elemento del enumerable.
 
-        @param {Object<__Enum>|Enumerator} enum - Lista de la cual obtener la sublista
+        @param {Object<__Enum>|Enumerator} enum - Objeto enumerable.
         @param {Integer} numArgs - Número de argumentos que admitirá el enumerable.
-        @param {Func} filtro - Función condición que recibirá, para cada elemento del enumerable, los valores en orden de las posiciones introducidas. 
-        @param {Integer} posiciones - Serie de posiciones de los argumentos de un elemento del enumerable. Los valores de esas posiciones en cada elemento del enumerable se pasaran en orden a filtro. Si se introduce una posición repetida, se considera la última introducida. Si no se introduce ninguna posición, se consideran todos los argumentos del enumerable.
+        @param {Func} filtro - Función condición que recibirá, para cada elemento del enumerable, los valores de las posiciones en orden. 
+        @param {Integer} posiciones - Serie de posiciones de los argumentos de un elemento del enumerable. Los valores de esas posiciones de los argumentos en cada elemento del enumerable se pasaran en orden a filtro. Si una posición no está, definida se ignora. Si se introducen posiciones repetidas, se considera la primera introducida. Si no se introduce ninguna posición, se pasarán a filtro todos los argumentos del enumerable. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
 
         @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
         @throws {Err_ValorArgError} - Si los valores de los argumentos no son válidos.
@@ -427,26 +425,21 @@ if (!IsSet(__UTIL_H__)) {
 
         @return {Array} - Lista de elementos del enumerable que han pasado un filtro. Si cada elemento está formado por varios valores (tantos como numArgs), devuelve un array de arrays.
     */
-    Util_SubEnumerable(enum, numArgs, filtro, posiciones*) {
+    _Util_SubEnumerableM(enum, numArgs, filtro, posiciones*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
+
         if posiciones.Length == 0
-            posiciones := Util_CrearLista(numArgs)
+            _posiciones := Util_CrearLista(numArgs)
         else {
-            indice := posiciones.Length
-            posicionesRepe := Map()
-            Loop posiciones.Length {
-                posiciones[indice] := Err_VerificarArg_Prv(posiciones[indice], "posiciones[" indice "]", 3 + indice, FuncArg.EsEntero, FuncArg.Entero, FuncArg((p) => p >= 1 and p <= numArgs, FuncArg.TIPO_FUNC["Validar"], "Cada posición tiene que estar entre 1 y el numArgs del enumerable"))
-                
-                if !posicionesRepe.Has(posiciones[indice])
-                    posicionesRepe[posiciones[indice]] := true
-                else
-                    posiciones.RemoveAt(indice)
-                
-                indice--
-            }
+            _posiciones := []
+            for posicion in posiciones
+                if IsSet(posicion)
+                    _posiciones.Push(Err_VerificarArg_Prv(posicion, "posiciones[" A_Index "]", 3 + A_Index, FuncArg.EsEntero, FuncArg.Entero, FuncArg((p) => p >= 1 and p <= numArgs, FuncArg.TIPO_FUNC["Validar"], "Cada posición tiene que estar entre 1 y el numArgs del enumerable")))
+
+            _posiciones.EliminarDuplicados()
         }
 
-        Err_VerificarArg_Prv(filtro, "filtro", posiciones.Length, FuncArg.Admite2Args)
+        Err_VerificarArg_Prv(filtro, "filtro", 3, FuncArg((f) => Err_AdmiteNumArgs(f, _posiciones.Length), FuncArg.TIPO_FUNC["Comprobar"], "Filtro no es una función o no admite " _posiciones.Length " argumentos"))
 
         resultado := Array()
         valoresRef := Array()
@@ -457,15 +450,14 @@ if (!IsSet(__UTIL_H__)) {
             valores := Array()
             subValores := Array()
 
-            for valorRef in valoresRef {
+            for valorRef in valoresRef
+                valores.Push(%valorRef%?)
 
-            }
-            for posicion in posiciones {
-                subValores.Push(%valoresRef[posicion]%?)
-            }
+            for posicion in _posiciones
+                subValores.Push(valores[posicion]?)
 
             try
-                if filtro(valores*)
+                if filtro(subValores*)
                     resultado.Push(valores)
             catch as e
                 throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
@@ -474,6 +466,8 @@ if (!IsSet(__UTIL_H__)) {
         return resultado
     }
     
+    Enumerator.Prototype.DefineProp("Sub", {Call: _Util_SubEnumerableM})
+
 
     /*
         @function Util_EnumerableACadena
@@ -491,7 +485,7 @@ if (!IsSet(__UTIL_H__)) {
         @returns {String} Devuelve un String de los valores de la lista convertidos a cadena..
     */
     _Util_EnumerableACadenaM(enum, numArgs := 1, sepGrupo := ";", sepPartes := ":") {
-        enum := Err_VerificarEnumerable(e, numArgs)
+        enum := Err_VerificarEnumerable(enum, numArgs)
         sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, FuncArg.Cadena)
         sepPartes := Err_VerificarArg_Prv(sepPartes, "sepPartes", 4, FuncArg.Cadena)
 
@@ -509,7 +503,7 @@ if (!IsSet(__UTIL_H__)) {
 
         return RTrim(cadena, sepGrupo " ")
     }
-  
+
     ; Se añade como método a Map, Array y Enumerator
     Enumerator.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
     Array.Prototype.DefineProp("ToString", {Call: _Util_EnumerableACadenaM})
@@ -728,22 +722,25 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_EliminarDuplicadosMA(lista, final := true) {        
         valoresDup := Map()
-        indicesDup := Array()
 
-        indice := inc := final ? 1 : -1
-        Loop lista.Length {
-            if !valoresDup.Has(lista[indice])
-                valoresDup[lista[indice]] := true
-            else
-                indicesDup.Push(indice)
-
-            indice += inc
+        if !!final {
+            indice := incNoBorrar := 1
+            incBorrar := 0
         }
+        else
+            indice := incBorrar := incNoBorrar := -1
 
-        indice := inc := final ? -1 : 1
-        Loop indicesDup.Length {
-            lista.RemoveAt(indicesDup[indice])
-            indice += inc
+        valorIndef := {}  ; Al usarse la referencia como clave, es única para este objeto.
+        Loop lista.Length {
+            valor := lista.Has(indice) ? lista[indice] : valorIndef
+            if !valoresDup.Has(valor) {
+                valoresDup[valor] := true
+                indice += incNoBorrar
+            }
+            else {
+                lista.RemoveAt(indice)
+                indice += incBorrar
+            }
         }
     }
 
@@ -760,12 +757,16 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_EliminarDuplicadosMM(dicc) {
         valoresDup := Map()
+        clavesBorrables := []
 
         for clave, valor in dicc
-            if !valoresDup.Has(valor)
+            if !valoresDup.Has(valor) {
+                clavesBorrables.Push(clave)
                 valoresDup[valor] := true
-            else
-                dicc.Delete(clave)
+            }
+
+        for clave in clavesBorrables
+            dicc.Delete(clave)
     }
 
     ; Se añade como método a Map
@@ -775,11 +776,11 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_EliminarDuplicados
 
-        @decripción Eliminar los valores duplicados de un diccionario. El diccionario se modifica quedando con los valores no duplicados. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referenci el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
+        @decripción Eliminar los valores duplicados de un enum. El diccionario se modifica quedando con los valores no duplicados. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referenci el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
 
         @param {Map} dicc - Map a eliminar sus duplicados
     */
-    _Util_EliminarDuplicados(enum, numArgs, *posiciones) {
+    _Util_EliminarDuplicadosM(enum, numArgs, posiciones*) {
         valoresDup := Map()
 
         for clave, valor in dicc
@@ -789,8 +790,9 @@ if (!IsSet(__UTIL_H__)) {
                 dicc.Delete(clave)
     }
 
-    ; Se añade como método a Map
-    Map.Prototype.DefineProp("EliminarDuplicados", {Call: _Util_EliminarDuplicadosMM})
+    ; Se añade como método a Enumerator
+    Enumerator.Prototype.DefineProp("EliminarDuplicados", {Call: _Util_EliminarDuplicadosM})
+    global Util_EliminarDuplicados := _Util_EliminarDuplicadosM
 
 
     /*
