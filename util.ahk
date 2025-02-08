@@ -455,9 +455,14 @@ if (!IsSet(__UTIL_H__)) {
 
         while enum(valoresRef*) {
             valores := Array()
+            subValores := Array()
 
-            for posicion in posiciones
-                valores.Push(%valoresRef[posicion]%?)
+            for valorRef in valoresRef {
+
+            }
+            for posicion in posiciones {
+                subValores.Push(%valoresRef[posicion]%?)
+            }
 
             try
                 if filtro(valores*)
