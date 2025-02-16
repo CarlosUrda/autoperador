@@ -110,29 +110,15 @@ if (!IsSet(__ERR_H__))
         @returns true o false.
     */
     _Err_AdmiteNumArgsM(funcion, numArgs) {
-       ; No podemos llamar a Err_VerificarArg (ni DefinirPropEstandar) porque necesitamos FuncArg y crearíamos un bucle
-
-        if !IsInteger(numArgs) {
-            m := "El valor de numArgs debe ser entero"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "numArgs", 2, numArgs, Type(numArgs))
-        }
-
-        numArgs := Integer(numArgs)
-        if numArgs < 0 {
-            m := "El número de argumentos debe ser entero >= 0"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "numArgs", 2, numArgs)
-        }
+       ; No bucle al no crear FuncArg nueva. Son FuncArgs ya creadas => no hay riesgo de rellamada a AdmiteNumArgs
+        numArgs := Err_VerificarArg_Prv(numArgs, "numArgs", 2, FuncArg.EsEntero, FuncArg.Entero, FuncArg.EsNatural)
 
         return numArgs >= funcion.MinParams and (numArgs <= funcion.MaxParams or funcion.IsVariadic)
     }
 
     _Err_AdmiteNumArgs(funcion, numArgs) {
-       ; No podemos llamar a Err_VerificarArg (ni DefinirPropEstandar) porque necesitamos FuncArg y crearíamos un bucle
-
-        if !Err_EsLlamable(funcion) {
-            m := "No has pasado una función o un objeto llamable"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m, , , , , , "funcion", 1, funcion, Type(funcion))
-        }
+       ; No bucle al no crear FuncArg nueva. Son FuncArgs ya creadas => no hay riesgo de rellamada a AdmiteNumArgs
+        Err_VerificarArg_Prv(funcion, "funcion", 1, FuncArg.EsLlamable)
 
         if !(funcion is Func) {
             funcion := funcion.Call
@@ -334,21 +320,25 @@ if (!IsSet(__ERR_H__))
     class FuncArg {
         static __New() {
             this.TIPO_FUNC := Map("Comprobar", 1, "Validar", 2, "Convertir", 3)
+            this.TIPO_FUNC_INV := this.TIPO_FUNC.Invertir()
             this._TIPO_ERROR := Map(this.TIPOS_FUNC["Comprobar"], Err_TipoArgError, this.TIPOS_FUNC["Validar"], Err_ValorArgError, this.TIPOS_FUNC["Convertir"], Err_FuncArgError)
             this._MENSAJES := Map(this.TIPOS_FUNC["Comprobar"], "El valor no cumple la comprobación", this.TIPOS_FUNC["Validar"], "El valor no cumple la validación", this.TIPOS_FUNC["Convertir"], "No se ha podido aplicar al valor la conversión")
 
             ; Objetos FuncArg genéricos
-            this.Cadena := FuncArg(String, FuncArg.TIPO_FUNC["Convertir"], "No se puede convertir a una cadena (String)")
-            this.Entero := FuncArg(Integer, FuncArg.TIPO_FUNC["Convertir"], "No se puede convertir a un entero (Integer)")
-            this.EsEntero := FuncArg(IsInteger, FuncArg.TIPO_FUNC["Comprobar"], "No es un entero sin decimales")
-            this.FechaValida := FuncArg((f) => FormatTime(f) != "", FuncArg.TIPO_FUNC["Validar"], "La fecha no está en un formato válido YYYYMMDDHH24MISS")
-            this.EsError := FuncArg((e) => e is Error, FuncArg.TIPO_FUNC["Comprobar"], "La excepción tiene que ser tipo Error")
-            this.EsClase := FuncArg((o) => o is Class, FuncArg.TIPO_FUNC["Comprobar"], "El objeto no es una clase (Class)")
-            this.EsNatural := FuncArg((n) => n >= 0, FuncArg.TIPO_FUNC["Validar"], "El valor debe ser >= 0")
-            this.EsPositivo := FuncArg((n) => n >= 1, FuncArg.TIPO_FUNC["Validar"], "El valor debe ser >= 1")
-            this.EsFuncArg := FuncArg((f) => f is FuncArg, FuncArg.TIPO_FUNC["Comprobar"], "No es una función válida de tipo FuncArg")
-            this.EsLlamable := FuncArg(Err_EsLlamable, FuncArg.TIPO_FUNC["Comprobar"], "Tiene que ser una función o un objeto llamable")
-            this.Admite2Args := FuncArg((f) => Err_AdmiteNumArgs(f, 2), FuncArg.TIPO_FUNC["Comprobar"], "No es una función o no admite 2 argumentos")
+            this.Cadena := FuncArg(String, "Convertir", "No se puede convertir a una cadena (String)")
+            this.Entero := FuncArg(Integer, "Convertir", "No se puede convertir a un entero (Integer)")
+            this.EsEntero := FuncArg(IsInteger, "Comprobar", "No es un entero sin decimales")
+            this.FechaValida := FuncArg(IsTime, "Validar", "La fecha no está en un formato válido YYYYMMDDHH24MISS")
+            this.EsError := FuncArg((e) => e is Error, "Comprobar", "La excepción tiene que ser tipo Error")
+            this.EsClase := FuncArg((o) => o is Class, "Comprobar", "El objeto no es una clase (Class)")
+            this.EsLista := FuncArg((l) => l is Array, "Comprobar", "El objeto no es una Lista (Array)")
+            this.EsReferencia := FuncArg((l) => l is VarRef, "Comprobar", "El objeto no es una referencia VarRef")
+            this.EsDicc := FuncArg((d) => d is Map, "Comprobar", "El objeto no es un Diccionario (Map)")
+            this.EsNatural := FuncArg((n) => n >= 0, "Validar", "El valor debe ser >= 0")
+            this.EsPositivo := FuncArg((n) => n >= 1, "Validar", "El valor debe ser >= 1")
+            this.EsFuncArg := FuncArg((f) => f is FuncArg, "Comprobar", "No es una función válida de tipo FuncArg")
+            this.EsLlamable := FuncArg(Err_EsLlamable, "Comprobar", "Tiene que ser una función o un objeto llamable")
+            this.Admite2Args := FuncArg((f) => Err_AdmiteNumArgs(f, 2), "Comprobar", "No es una función o no admite 2 argumentos")
         }
 
         __New(funcion, codigoTipoFunc, mensaje?, tipoError?) {
@@ -399,12 +389,14 @@ if (!IsSet(__ERR_H__))
             }
 
             set {
-                if !IsInteger(value) or !this.TIPO_FUNC.ContieneValor(value) {
-                    m := "El código del tipo de función no es válido"
+                if FuncArg.TIPO_FUNC.Has(value)
+                    this._codigoTipoFunc := FuncArg.TIPO_FUNC[value]
+                else if FuncArg.TIPO_FUNC_INV.Has(value)
+                    this._codigoTipoFunc := value ; Las claves son fuertemente tipadas. "1" no llegaría aquí.
+                else {
+                    m := "El tipo de función no es válido: tiene que ser nombre del tipo o el código entero"
                     throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m, , , , , , "CodigoTipoFunc", 1, value)
                 }
-
-                this._codigoTipoFunc := Integer(value)
             }
         }
 

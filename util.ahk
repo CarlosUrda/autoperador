@@ -10,6 +10,8 @@
         - Cambiar las llamadas a Err_Lanzar venga de capturar una expeción para relanzarla. Si además capturo una excepción que he lanzado yo desde mi código no hace falta volver a meter el código de error como argumento.
         - Hace un módulo de testing por cada librería, donde se pruebe cada función.
         - Aunque se verifica el enumerable en las funciones que reciben uno, y al recorrerlo tiene que recibir el número de argumentos correcto y por referencia, no se comprueba que, por lo que sea, dentro de la ejecución de cada iteración del enumerable se cometa un fallo. Digamos que verificarEnumerable comrpueba que está todo bien hasta que se entra dentro del enumerable en la ejecución de cada iteración. Si se termina comprobando esto, se debe propagar un error Err_EnumerableError.
+        - Añadir la complejidad de cada función en la documentación.
+        - Hacer un módulo de testing para cada librería.
 
         Pasos:
         - Modificar los Err_ArgError con la nueva modificación.
@@ -18,7 +20,7 @@
         - Probar si se puede hacer unset con Set para eliminar la función de comparación.
         - Tener en cuenta que si hay función de comparación en MapOrden no hace falta preocuparse si meter los valores en orden.
         - Adaptar Util y error a los errores personalizados.
-        - Funcion MergeSort, MapORdenado y  MapPrioridades.
+        - Funcion MergeSort, MapOOrdenado y  MapPrioridades.
         - Probar debug.
         - Hacer testing de todo usando debug.
         - Acabar config
@@ -67,7 +69,7 @@ if (!IsSet(__UTIL_H__)) {
 
 
     /*
-        @function Util_CrearLista
+        @function Util_CrearRango
 
         @description Crear una lista con valores del 1 al número de elementos pasado.
 
@@ -76,7 +78,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @returns {Array} - Lista con los valores
     */
-    Util_CrearLista(numElementos, asc := true) {
+    Util_CrearRango(numElementos, asc := true) {
         numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, FuncArg.EsEntero, FuncArg.Entero, FuncArg.EsNatural)
 
         lista := []
@@ -93,6 +95,26 @@ if (!IsSet(__UTIL_H__)) {
             lista.Push(valor + factor*A_Index)
 
         return lista
+    }
+
+
+    /*
+        @function Util_CrearListaRefs
+
+        @description Crear una lista cuyos elementos son referencias a valores.
+
+        @param {Integer} numElementos - Número de elementos que tendrá la lista
+
+        @returns {Array} - Lista con las referencias como elementos.
+    */
+    Util_CrearListaRefs(numElementos) {
+        numElementos := Err_VerificarArg_Prv(numElementos, "numElementos", 1, FuncArg.EsEntero, FuncArg.Entero, FuncArg.EsNatural)
+
+        valoresRef := Array()
+        Loop numElementos
+            valoresRef.Push(Util_CrearVarRef())
+
+        return valoresRef
     }
 
 
@@ -286,7 +308,7 @@ if (!IsSet(__UTIL_H__)) {
     }
 
     _Util_DefinePropEstandar(obj, prop, funciones*) {
-        Err_VerificarArg_Prv(obj, "obj", 1, FuncArg((o) => o is Object, FuncArg.TIPO_FUNC["Comprobar"], "Debes pasar un objeto Object para definir la nueva propiedad"))
+        Err_VerificarArg_Prv(obj, "obj", 1, FuncArg((o) => o is Object, "Comprobar", "Debes pasar un objeto Object para definir la nueva propiedad"))
 
         return obj.DefinePropEstandar(prop, funciones*)
     }
@@ -345,30 +367,48 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubLista
 
-        @description Modificar un array obteniendo una sublista formada con los elementos (índices reenumerados a partir de 1) que cumplan la condición de la funcion filtro.
+        @description Obtener una sublista formada con los elementos (índices reenumerados a partir de 1) que cumplan la condición de la funcion filtro.
 
-        @param {Array} lista - Lista a ser modifcada.
+        @param {Array} lista - Lista original a partir de la cual obtener la sublista.
         @param {Func} filtro - Función condición que recibirá el índice y valor de cada elemento. Devolverá true o false si cumple o no la condición. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
+        @param {Boolean} nuevo - Si se crea una nueva lista o solo se modifica la original.
 
         @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
         @throws {Err_FuncError} - Si filtro genera algún error al ser ejecutado.
 
+        @returns {Array} - Sublista obtenida. Si se modifica la original es la misma lista cambiada. Si no, se devuelve una lista nueva.
+
+        @complexity O(n^2) siendo n el número de elementos de la lista, si se modifica la lista original. O(n) si se crea una nueva lista.
+
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    _Util_SubListaM(lista, filtro) {
+    _Util_SubListaM(lista, filtro, nuevo := false) {
         Err_VerificarArg_Prv(filtro, "filtro", 2, FuncArg.Admite2Args)
-        ; enum := Err_VerificarEnumerable(lista, 2)
 
-        indice := lista.Lenght + indice + 1
-        Loop lista.Length {
-            try
-                if !filtro(indice, lista[indice]?)
-                    lista.RemoveAt(indice)              
-            catch as e
-                throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
+        if !nuevo {
+            indice := lista.Length
+            Loop lista.Length {
+                try
+                    if !filtro(indice, lista.Has(indice) ? lista[indice] : unset)
+                        lista.RemoveAt(indice)              
+                catch as e
+                    throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
-            indice--
+                indice--
+            }
         }
+        else {
+            _lista := lista
+            lista := []
+            for indice, valor in _lista
+                try
+                    if !!filtro(indice, valor?)
+                        lista.Push(valor?)
+                catch as e
+                    throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
+        }
+
+        return lista
     }
     
     ; Se añade como método a Array
@@ -379,30 +419,46 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubDicc
 
-        @description Modificar un map obteniendo un subdiccionario formado con los elementos (clave, valor) que cumplan la condición de la funcion filtro.
+        @description Obtener un subdiccionario formado con los elementos (clave, valor) que cumplan la condición de la funcion filtro.
 
         @param {Map} dicc - Diccionario a ser modificado.
         @param {Func} filtro - Función condición que recibirá la clave y valor de cada elemento. Devolverá true o false si cumple o no la condición.
+        @param {Boolean} nuevo - Si se crea un nuevo diccionario o solo se modifica el original.
 
         @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
         @throws {Err_FuncError} - Si filtro genera algún error al ser ejecutado.
 
+        @returns {Map} - Subdiccionario obtenido. Si se modifica el original es el mismo diccionario cambiada. Si no, se devuelve un diccionario nuevo.
+
         @todo Cuando se filtra por índice al modificar la lista, el valor obtenido en cada iteración no se usa en ningún momento y se pasa a filtro para nada. También a filtro se pasa índice inútilmente cuando se filtra por valor. El coste de solucionarlo consiste en escribir mucho más código con bucles for y llamadas a filtro específicas para cada caso, que por ahora no creo que compense.
     */
-    _Util_SubDiccM(dicc, filtro) {
+    _Util_SubDiccM(dicc, filtro, nuevo := false) {
         Err_VerificarArg_Prv(filtro, "filtro", 2, FuncArg.Admite2Args)
-        ;enum := Err_VerificarEnumerable(dicc, 2)
 
-        borrables := []
-        for clave, valor in dicc
-            try 
-                if !filtro(clave, valor)
-                    borrables.Push(clave)
-            catch as e
-                throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
+        if !nuevo {
+            borrables := []
+            for clave, valor in dicc
+                try 
+                    if !filtro(clave, valor)
+                        borrables.Push(clave)
+                catch as e
+                    throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
 
-        for clave in borrables
-            dicc.Delete(clave)
+            for clave in borrables
+                dicc.Delete(clave)
+        }
+        else {
+            _dicc := dicc
+            dicc := Map()
+            for clave, valor in _dicc
+                try 
+                    if !!filtro(clave, valor)
+                        dicc[clave] := valor
+                catch as e
+                    throw Err_FuncArgError("Filtro no ejecutado correctamente", , , , , e, "filtro", 2, filtro)
+        }
+
+        return dicc
     }
     
     ; Se añade como método a Map
@@ -412,39 +468,25 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_SubEnumerableM
 
-        @description Obtener un array con los elementos de un enumerable que pasan un filtro. Si el enumrable admite varios argumentos, cada elemento dentro de la lista resultante será un array con los valores de cada elemento del enumerable.
+        @description Obtener una lista con los elementos de un enumerable que pasan un filtro. Cada elemento del enumerable estará formado por tantos valores como numRags y resultará en una sublista formada por esos valores. El filtro se aplicará en cada elemento a sus valores en las posiciones indicadas de los argumentos.
 
         @param {Object<__Enum>|Enumerator} enum - Objeto enumerable.
         @param {Integer} numArgs - Número de argumentos que admitirá el enumerable.
         @param {Func} filtro - Función condición que recibirá, para cada elemento del enumerable, los valores de las posiciones en orden. 
-        @param {Integer} posiciones - Serie de posiciones de los argumentos de un elemento del enumerable. Los valores de esas posiciones de los argumentos en cada elemento del enumerable se pasaran en orden a filtro. Si una posición no está, definida se ignora. Si se introducen posiciones repetidas, se considera la primera introducida. Si no se introduce ninguna posición, se pasarán a filtro todos los argumentos del enumerable. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
+        @param {Integer} posiciones - Serie de posiciones de los argumentos de un elemento del enumerable. Los valores en esas posiciones de los argumentos en cada elemento del enumerable se pasaran en orden a filtro. Si una posición no está definida se ignora. Si se introducen posiciones repetidas, se considera la primera introducida. Si no se introduce ninguna posición, se pasarán a filtro todos los argumentos del enumerable. Tener en cuenta que el valor pasado de algún argumento puede no estar definido.
 
-        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_TipoArgError|Err_MethodError} - Si hay algún error al verificar el enumerable.
         @throws {Err_ValorArgError} - Si los valores de los argumentos no son válidos.
-        @throws {Err_FuncArgError} - Si filtro genera algún error al ser ejecutado.
 
-        @return {Array} - Lista de elementos del enumerable que han pasado un filtro. Si cada elemento está formado por varios valores (tantos como numArgs), devuelve un array de arrays.
+        @return {Array} - Lista de elementos del enumerable que han pasado un filtro. Devuelve un array de arrays.
     */
     _Util_SubEnumerableM(enum, numArgs, filtro, posiciones*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
-
-        if posiciones.Length == 0
-            _posiciones := Util_CrearLista(numArgs)
-        else {
-            _posiciones := []
-            for posicion in posiciones
-                if IsSet(posicion)
-                    _posiciones.Push(Err_VerificarArg_Prv(posicion, "posiciones[" A_Index "]", 3 + A_Index, FuncArg.EsEntero, FuncArg.Entero, FuncArg((p) => p >= 1 and p <= numArgs, FuncArg.TIPO_FUNC["Validar"], "Cada posición tiene que estar entre 1 y el numArgs del enumerable")))
-
-            _posiciones.EliminarDuplicados()
-        }
-
-        Err_VerificarArg_Prv(filtro, "filtro", 3, FuncArg((f) => Err_AdmiteNumArgs(f, _posiciones.Length), FuncArg.TIPO_FUNC["Comprobar"], "Filtro no es una función o no admite " _posiciones.Length " argumentos"))
+        posiciones := Err_VerificarArg(posiciones, "posiciones", 3, FuncArg((l) => l.Length == 0 ? Util_CrearRango(numArgs) : l.LimpiarEnteros(1, numArgs, true), "Convertir", "Los valores de las posiciones no son válidos", Err_ValorArgError))
+        Err_VerificarArg_Prv(filtro, "filtro", 3, FuncArg((f) => Err_AdmiteNumArgs(f, posiciones.Length), "Comprobar", "Filtro no es una función o no admite " posiciones.Length " argumentos"))
 
         resultado := Array()
-        valoresRef := Array()
-        Loop numArgs
-            valoresRef.Push(Util_CrearVarRef())
+        valoresRef := Util_CrearListaRefs(numArgs)
 
         while enum(valoresRef*) {
             valores := Array()
@@ -453,8 +495,8 @@ if (!IsSet(__UTIL_H__)) {
             for valorRef in valoresRef
                 valores.Push(%valorRef%?)
 
-            for posicion in _posiciones
-                subValores.Push(valores[posicion]?)
+            for posicion in posiciones
+                subValores.Push(valores.Has(posicion) ? valores[posicion] : unset)
 
             try
                 if filtro(subValores*)
@@ -489,14 +531,18 @@ if (!IsSet(__UTIL_H__)) {
         sepGrupo := Err_VerificarArg_Prv(sepGrupo, "sepGrupo", 3, FuncArg.Cadena)
         sepPartes := Err_VerificarArg_Prv(sepPartes, "sepPartes", 4, FuncArg.Cadena)
 
-        valoresRef := Array()
-        Loop numArgs
-            valoresRef.Push(Util_CrearVarRef())
+        valoresRef := Util_CrearListaRefs(numArgs)
 
         cadena := ""
         while enum(valoresRef*) {
-            for valorRef in valoresRef
-                cadena .= (%valorRef% ?? "") sepPartes " "
+            for valorRef in valoresRef {
+                try
+                    cadena .= (IsSetRef(valorRef) ? String(%valorRef%) : "")
+                catch
+                    cadena .= "<*********>"
+                
+                cadena .= sepPartes " "
+            }
 
             cadena := RTrim(cadena, sepPartes " ") sepGrupo " "
         }
@@ -512,29 +558,137 @@ if (!IsSet(__UTIL_H__)) {
   
 
     /*
+        @function Util_InvertirIndicesValoresM
+
+        @description Crear un diccionario tomando como clave cada valor de la lista y como valor el índice asociado a cada valor. Si un valor esta repetido, al convertirlo a clave del diccionario tendrá como valor su último índice.
+
+        @param {Array} - Lista a invertir sus valores e índices.
+        @param {Any} valorIndef - Valor que será usado para representar al valor indefinido en caso de haberlo en la lista. Si no está definido se ignoran los valores no definidos de la lista
+
+        @returns {Map} - Diccionario con los valores de la lista como claves y los índices como valores.
+
+        @complexity O(n) siendo n el número de elementos de la lista.
+    */
+    _Util_InvertirIndicesValoresM(lista, valorIndef?) {
+        dicc := Map()
+
+        if IsSet(valorIndef)
+            for indice, valor in lista
+                (!IsSet(valor) ? dicc[valorIndef] : dicc[valor]) := indice
+        else
+            for indice, valor in lista
+                if IsSet(valor)
+                    dicc[valor] := indice
+
+        return dicc
+    }
+
+    _Util_InvertirIndicesValores(lista, valorIndef?) {
+        Err_VerificarArg_Prv(lista, "lista", 1, FuncArg.EsLista)
+
+        return lista.InvertirIndicesValores(valorIndef?)
+    }
+
+    Array.Prototype.DefineProp("InvertirIndicesValores", {Call: _Util_InvertirIndicesValoresM})
+    global Util_InvertirIndicesValores := _Util_InvertirIndicesValores
+
+
+    /*
+        @function Util_InvertirClavesValoresM
+
+        @description Invertir las claves y valores, de manera que los valores se conviertan en las claves y las claves en los valores. Si un valor esta repetido, el valor asociado que tendrá como clave será el de la última clave con dicho valor en el diccionario original.
+
+        @param {Map} - Diccionario a invertir sus valores y clavess.
+
+        @returns {Map} - Nuevo diccionario con los valores del diccionario original como claves y las claves como valores.
+    */
+    _Util_InvertirClavesValoresM(dicc) {
+        _dicc := Map()
+
+        for indice, valor in dicc
+            _dicc[valor] := indice
+
+        return _dicc
+    }
+
+    _Util_InvertirClavesValores(dicc) {
+        Err_VerificarArg_Prv(dicc, "dicc", 1, FuncArg.EsDicc)
+
+        return dicc.InvertirClavesValores()
+    }
+
+    Map.Prototype.DefineProp("InvertirClavesValores", {Call: _Util_InvertirClavesValoresM})
+    global Util_InvertirClavesValores := _Util_InvertirClavesValores
+
+
+    /*
+        @function Util_InvertirOrdenM
+
+        @description Invertir el orden de los elementos de una lista. Si nuevo es true, se crea una nueva lista con los elementos invertidos. Si no, se modifica la lista original.
+
+        @param {Array} lista - Lista a invertir.
+        @param {Boolean} nuevo - Si se crea una nueva lista o se modifica la original.
+
+        @returns {Array} - Lista con los elementos invertidos.
+    */
+    _Util_InvertirOrdenM(lista, nuevo := false) {
+        if !nuevo {
+            Loop lista.Length // 2 {
+                if lista.Has(A_Index) 
+                    valor := lista[A_Index]
+                indiceFinal := lista.Length - A_Index + 1
+
+                if lista.Has(indiceFinal)
+                    lista[A_Index] := lista[indiceFinal]
+                else
+                    lista.Delete(A_Index)
+
+                if IsSet(valor)
+                    lista[indiceFinal] := valor
+                else
+                    lista.Delete(indiceFinal)
+            }
+        }
+        else {
+            _lista := lista
+            lista := []
+            Loop _lista.Length {
+                indice := _lista.Length - A_Index + 1
+                lista.Push(_lista.Has(indice) ? _lista[indice] : unset)
+            }
+        }
+
+        return lista
+    }
+
+    Array.Prototype.DefineProp("InvertirOrden", {Call: _Util_InvertirOrdenM})
+
+
+    /*
         @function Util_ObtenerIndices
         
-        @description Obtener una lista de índices de una lista. Se recorre la lista y, para cada elemento, comprueba si valor coincide. Si coincide, el índice se incluirá en la lista devuelta. Si no se pasa nigún valor, se devuelven los índices que tengan algún valor definido.
+        @description Obtener una lista de índices de una lista. Se recorre la lista y, para cada elemento, comprueba si valor coincide con alguno de los valores pasados a la función (se aceptan valores no definidos). Si coincide, el índice se incluirá en la lista devuelta. Si no se pasa nigún valor, se devuelven los índices que tengan algún valor definido.
 
         @param {Array} lista - Lista de donde obtener los índices.
-        @param {Object} valor - Valor a ser comparado con cada elemento de la lista.
+        @param {Any} valores - Serie de valores a ser comparado con cada elemento de la lista.
 
         @returns {Array} - Array de índices. Si se pasa valor, índices de los elementos que coinciden. Si no se pasa valor, índices con elementos definidos.
-    */
-    _Util_ObtenerIndices(lista, valor?) {
-        ;enum := Err_VerificarEnumerable(lista, 2)
 
+        @todo Se podría hacer más rápido creando un diccionario donde las claves son los valores, y así la comprobación sería inmediata. El problema es que los valores no definidos no se pueden guardar como clave, así que habría que usar una referencia a un objeto vacío {} para usarlo como clave y tenerlo en cuenta cuando se comprueba un valor no definido.
+    */
+    _Util_ObtenerIndices(lista, valores*) {
         indices := []
 
-        if IsSet(valor) {
-            for indice, _valor in lista
-                if IsSet(_valor) and _valor == valor
+        if valores.Length > 0 {
+            valoresDicc := valores.InvertirIndicesValores(indef := {})
+            for indice, valor in lista
+                if valoresDicc.Has(valor ?? indef)  ; Sin invertir lista valores usar valores.ContieneValorvalor(valor)
                     indices.Push(indice)
 
         }
         else {
-            for indice, _valor in lista
-                if IsSet(_valor)
+            for indice, valor in lista
+                if IsSet(valor)
                     indices.Push(indice)
         }
 
@@ -554,20 +708,21 @@ if (!IsSet(__UTIL_H__)) {
         @param {Object} valor - Valor a ser comparado con el valor de cada elemento del diccionario.
 
         @returns {Array} - Array de claves. Si se pasa valor, claves cuyo valor coincide. Si no se pasa valor, todas las claves del diccionario.
-    */
-    _Util_ObtenerClavesM(dicc, valor?) {
-        ;enum := Err_VerificarEnumerable(dicc, 2)
 
+        @todo Se podría hacer más rápido creando un diccionario donde las claves son los valores, y así la comprobación sería inmediata. El problema es que los valores no definidos no se pueden guardar como clave, así que habría que usar una referencia a un objeto vacío {} para usarlo como clave y tenerlo en cuenta cuando se comprueba un valor no definido.
+    */
+    _Util_ObtenerClavesM(dicc, valores*) {
         claves := []
 
-        if IsSet(valor) {
-            for clave, _valor in dicc
-                if _valor == valor
+        if valores.Length > 0 {
+            valoresDicc := valores.InvertirIndicesValores()
+            for clave, valor in dicc
+                if valoresDicc.Has(valor)  ; Sin invertir lista valores usar valores.ContieneValorvalor(valor)
                     claves.Push(clave)
 
         }
         else {
-            for clave, _valor in dicc
+            for clave, valor in dicc
                 claves.Push(clave)
         }
 
@@ -599,16 +754,14 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_ObtenerClaves(enum, numArgs, posClave, pos_valor*) {
         enum := Err_VerificarEnumerable(enum, numArgs)
-        FA_RangoPosicion := FuncArg((p) => p > 0 and p <= numArgs, FuncArg.TIPO_FUNC["Validar"], "La posición debe estar entre 1 y numArgs")
+        FA_RangoPosicion := FuncArg((p) => p > 0 and p <= numArgs, "Validar", "La posición debe estar entre 1 y numArgs")
         posClave := Err_VerificarArg_Prv(posClave, "posClave", 3, FuncArg.EsEntero, FuncArg.Entero, FA_RangoPosicion)
 
-        valoresRef := Array()
-        Loop numArgs
-            valoresRef.Push(Util_CrearVarRef())
+        valoresRef := Util_CrearListaRefs(numArgs)
         claves := Array()
 
         if pos_valor.Length > 0 {
-            Err_VerificarArg_Prv(pos_valor, "pos_valor", 4, FuncArg((pv) => Ceil(pv.Length / 2) <= numArgs, FuncArg.TIPO_FUNC["Validar"], "El número de valores debe ser <= numArgs")) 
+            Err_VerificarArg_Prv(pos_valor, "pos_valor", 4, FuncArg((pv) => Ceil(pv.Length / 2) <= numArgs, "Validar", "El número de valores debe ser <= numArgs")) 
 
             while enum(valoresRef*) {
                 if !IsSetRef(valoresRef[posClave])
@@ -616,6 +769,11 @@ if (!IsSet(__UTIL_H__)) {
 
                 valorOK := true
                 Loop pos_valor.Length {
+                    if !pos_valor.Has(A_Index) {
+                        A_Index++
+                        continue
+                    }
+
                     posArg := Err_VerificarArg_Prv(pos_valor[A_Index], "pos_valor[" A_Index "]", 3 + A_Index, FuncArg.EsEntero, FuncArg.Entero, FA_RangoPosicion)
 
                     if !((!IsSetRef(valoresRef[posArg]) and !pos_valor.Has(++A_Index)) or (IsSetRef(valoresRef[posArg]) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
@@ -633,20 +791,16 @@ if (!IsSet(__UTIL_H__)) {
                 if !IsSetRef(valoresRef[posClave])
                     continue
 
-                valorOK := false
                 for valorRef in valoresRef
                     if A_Index != posClave and IsSetRef(valorRef) {
-                        valorOK := true
+                        claves.Push(%valoresRef[posClave]%)
                         break
                     }
-                
-                if valorOK
-                    claves.Push(%valoresRef[posClave]%)
             }
         } 
         else
             while enum(valoresRef*)
-                if !IsSetRef(valoresRef[posClave])
+                if IsSetRef(valoresRef[posClave])
                     claves.Push(%valoresRef[posClave]%)
 
         return claves
@@ -655,6 +809,59 @@ if (!IsSet(__UTIL_H__)) {
     ; Se añade como método a Enumerator
     Enumerator.Prototype.DefineProp("Claves", {Call: _Util_ObtenerClaves})
     global Util_ObtenerClaves := _Util_ObtenerClaves
+
+
+    /*
+        @function Util_ContieneValor
+
+        @description Comprueba si una serie de valores coinciden con valores de algún elemento de un objeto enumerable.
+
+        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
+        @param {Integer} numArgs - Número de argumentos >= 1 que admite el enumerable por cada elemento.
+        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica, para cada posición de los argumentos del enumerable, el valor que tiene que contener.
+
+        @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
+
+        @throws {Err_TipoArgError} - Si el tipo de algún argumento es incorrecto.
+        @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
+    */
+    _Util_ContieneValor(enum, numArgs, pos_valor*) {
+        enum := Err_VerificarEnumerable(enum, numArgs)
+           
+        if Ceil(pos_valor.Length / 2) > numArgs {
+            m := "El número de valores debe ser <= numArgs"
+            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
+        }
+
+        if numArgs == 0
+            return false
+
+        valoresRef := Util_CrearListaRefs(numArgs)
+
+        while enum(valoresRef*) {
+            coincide := true
+            Loop pos_valor.Length {
+                posArg := Err_VerificarArg_Prv(pos_valor[A_Index], "pos_valor[" A_Index "]", 2 + A_Index, FuncArg.EsEntero, FuncArg.Entero, FuncArg((p) => p <= numArgs and p >= 1, "Validar", "La posición debe estar entre 1 y numArgs"))
+
+                ; Si creamos un FuncArg podemos generar un bucle. ContieneValor es llamado en FuncArg.
+                if !((!IsSetRef(valoresRef[posArg]) and !pos_valor.Has(++A_Index)) or (IsSetRef(valoresRef[posArg]) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
+                    coincide := false
+                    break
+                }
+            }
+
+            if coincide                    
+                return true
+        }
+
+        return false
+    }
+
+    ; Se añade Util_ContieneValor como método a Map y Array
+    Enumerator.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
+    Map.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(2, 2, v)})
+    Array.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(1, 1, v)})
+    global Util_ContieneValor := _Util_ContieneValor
 
 
     /*
@@ -695,7 +902,7 @@ if (!IsSet(__UTIL_H__)) {
     */
     _Util_OrdenarListaM(lista, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
         inicio := Err_VerificarArg_Prv(inicio, "inicio", 4, FuncArg.EsEntero, FuncArg.Entero)
-        fin := Err_VerificarArg_Prv(fin, "fin", 5, FuncArg.EsEntero, FuncArg.Entero, FuncArg((i) => inicio >= 1 and fin >= inicio, FuncArg.TIPO_FUNC["Validar"], "Los indices tienen que cumplir 1 <= inicio <= fin"))
+        fin := Err_VerificarArg_Prv(fin, "fin", 5, FuncArg.EsEntero, FuncArg.Entero, FuncArg((i) => inicio >= 1 and fin >= inicio, "Validar", "Los indices tienen que cumplir 1 <= inicio <= fin"))
 
         if lista.Length == 0 or (fin - inicio) <= 0
             return
@@ -708,8 +915,195 @@ if (!IsSet(__UTIL_H__)) {
         _Util_Combinar_Prv(lista, comparar, inicio, medio, fin)
     }
 
-    ; Se añade como método a Map y Array
+    ; Se añade como método a Array
     Array.Prototype.DefineProp("Ordenar", {Call: _Util_OrdenarListaM})
+
+    /*
+        @function _Util_BusquedaBinaria_Prv
+
+        @description Buscar un valor en una lista ordenada utilizando el algoritmo de búsqueda binaria. FUNCIÓN PARA USO INTERNO QUE NO COMPRUEBA NINGÚN ARGUMENTO.
+
+        @param {Array} lista - Lista ordenada donde buscar el valor. Se supone de longitud > 0.
+        @param {Any} valor - Valor a buscar.
+        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0.
+        @param {Integer} inicio - Posición del primer elemento de la sublista. Se supone >= 1 y <= fin.
+        @param {Integer} fin - Posición del último elemento de la sublista. Se supone >= inicio y <= lista.Length.
+
+        @returns {Integer} - Posición del valor en la lista. Si no se encuentra, devuelve 0.
+
+        @throws {Err_FuncArgError} - Si hay algún error al comparar los valores.
+
+        @complexity O(log n) siendo n el número de elementos de la lista.
+    */
+    _Util_BusquedaBinaria_Prv(lista, valor, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
+        if fin < inicio
+            return 0
+
+        medio := (fin + inicio) // 2
+        
+        try
+            resultadoComp := comparar(lista[medio], valor)
+        catch as e
+            throw Err_FuncArgError("Error al comparar valores en la búsqueda binaria", , , , , e, "comparar", 3, comparar)
+
+        if resultadoComp == 0
+            return medio
+        else if resultadoComp > 0
+            return _Util_BusquedaBinaria_Prv(lista, valor, comparar, inicio, medio - 1)
+        else
+            return _Util_BusquedaBinaria_Prv(lista, valor, comparar, medio + 1, fin)
+    }
+
+    /*       
+        @function _Util_BuscarValorM
+
+        @description Buscar un valor en una lista.
+
+        @param {Array} lista - Lista ordenada donde buscar el valor.
+        @param {Any} valor - Valor a buscar.
+        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0.
+        @param {Boolean} binaria - Indica si se realiza una búsqueda binaria (funciona en listas ya ordenadas). Si no, se realiza una busqueda secuencial.
+        @param {Integer} inicio - Posición del primer elemento de la sublista.
+        @param {Integer} fin - Posición del último elemento de la sublista.
+
+        @returns {Integer} - Posición del valor en la lista. Si no se encuentra, devuelve 0.
+
+        @complexity O(log n) siendo n el número de elementos de la lista, si la búsqueda es binaria en una lista ordenada; O(n) si la búsqueda es secuencial.
+    */
+    _Util_BuscarValorM(lista, valor, binaria := true, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
+        if lista.Length == 0
+            return 0
+        Err_VerificarArg_Prv(comparar, "comparar", 3, FuncArg.EsLlamable)
+        inicio := Err_VerificarArg_Prv(inicio, "inicio", 4, FuncArg.EsEntero, FuncArg.Entero)
+        fin := Err_VerificarArg_Prv(fin, "fin", 5, FuncArg.EsEntero, FuncArg.Entero, FuncArg((f) => inicio >= 1 and f >= inicio and f <= lista.Length, "Validar", "Los indices tienen que cumplir 1 <= inicio <= fin <= lista.Length"))
+
+        if !binaria {
+            for indice, v in lista
+                try
+                    if comparar(v, valor) == 0
+                        return indice
+                catch as e
+                    throw  Err_FuncArgError("Error al comparar valores en la búsqueda lineal", , , , , e, "comparar", 3, comparar)
+
+            return 0
+        }
+        else
+            return _Util_BusquedaBinaria_Prv(lista, valor, comparar, inicio, fin)
+    }
+
+    ; Se añade como método a Array
+    Array.Prototype.DefineProp("BuscarValor", {Call: _Util_BuscarValorM})
+
+
+    /*
+        @function Util_LimpiarListaEnteros
+
+        @description Obtener una lista en el mismo orden manteniendo los enteros que están dentro de de un rango y eliminando el resto (vacíos y no enteros). También se eliminan los enteros váĺidos duplicados (se mantiene el primer valor y se eliminan el resto duplicados).
+
+        @param {Array} lista - Lista de valores.
+        @param {Integer} minValor - Mínimo valor admitido entre los valores enteros en la lista
+        @param {Integer} maxValor - Máximo valor admitido entre los valores enteros en la lista
+        @param {Boolean} nuevo - Si se crea una nueva lista o solo se modifica la original.
+
+        @throws {Err_TipoArgError} - Si los tipos de los argumentos no son correctos.
+        @throws {Err_ValorArgError} - Si los valores de los argumentos no son válidos.
+
+        @returns {Array} - Lista con los valores enteros dentro del rango sin duplicar y en el mismo orden una vez eliminado todo lo demás.
+    */
+    _Util_LimpiarListaEnterosM(lista, minValor?, maxValor?, nuevo := false) {
+        if IsSet(minValor)
+            minValor := Err_VerificarArg_Prv(minValor, "minValor", 2, FuncArg.EsEntero, FuncArg.Entero)
+        if IsSet(maxValor)
+            maxValor := Err_VerificarArg_Prv(maxValor, "maxValor", 3, FuncArg.EsEntero, FuncArg.Entero, FuncArg((n) => !IsSet(minValor) or n >= minValor, "Validar", "Debe cumplirse minValor <= maxValor"))
+
+        return lista.Sub((_, v) => IsSet(v) and (v is Integer) and (!IsSet(minValor) or v >= minValor) and (!IsSet(maxValor) or v <= maxValor), nuevo).EliminarDuplicados(nuevo)
+    }
+
+    _Util_LimpiarListaEnteros(lista, minValor?, maxValor?, nuevo := false) {
+        Err_VerificarArg_Prv(lista, "lista", 2, FuncArg.EsLista)
+        return lista.LimpiarEnteros(minValor?, maxValor?, nuevo)
+    }
+
+    Array.Prototype.DefineProp("LimpiarEnteros", {Call: (v) => _Util_LimpiarListaEnterosM})
+    global Util_LimpiarListaEnteros := _Util_LimpiarListaEnteros
+
+
+    /*
+        @function Util_EliminarVaciosMA
+
+        @decripción Eliminar los valores vacíos no definidos una lista. La lista se modifica quedando con los valores 
+        no vacíos. 
+
+        @param {Array} lista - Array a eliminar sus valores vacíos.
+        @param {Boolean} nuevo - Si se crea una nueva lista o solo se modifica la original.
+
+        @returns {Array} - Lista con los valores no vacíos.
+    */
+    _Util_EliminarVaciosMA(lista, nuevo := false) {
+        if !nuevo {
+            indice := lista.Length
+            Loop lista.Length {
+                if !lista.Has(indice)
+                    lista.RemoveAt(indice)
+
+                indice--
+            }
+        }
+        else {
+            _lista := lista
+            lista := []
+            for indice, valor in _lista
+                if IsSet(valor)
+                    lista.Push(valor)
+        }
+
+        return lista
+    }
+
+    ; Se añade como método a Array
+    Array.Prototype.DefineProp("EliminarVacios", {Call: _Util_EliminarVaciosMA})
+
+
+    /*
+        @function Util_EliminarVacios
+
+        @description Eliminar los elementos vacíos de un enumerable. Se consideran elementos vacíos aquellos cuyos valores en las posiciones indicadas de los argumentos no están definidos.
+
+        @param {Object<__Enum>|Enumerator} enum - Objeto enumerable.
+        @param {Integer} numArgs - Número de argumentos que admitirá el enumerable.
+        @param {Integer} posiciones - Serie de posiciones de los argumentos de cada elemento del enumerable. Los valores del elemento del enumerable en orden en esas posiciones son los que se pomprueban si están definidos. Si una posición de posiciones no está definida se ignora. Si se introducen posiciones repetidas, se considera solo la primera introducida. Si no se introduce ninguna posición, se comprueban todos los valores del elemento del enumerable.
+
+        @throws {Err_TipoArgError|Err_MethodError} - Si hay algún error al verificar el enumerable.
+        @throws {Err_ValorArgError} - Si los valores de los argumentos no son válidos.
+
+        @returns {Array} - Lista de elementos del enumerable que tienen un valor definido. Devuelve un array de arrays.
+    */
+    _Util_EliminarVaciosM(enum, numArgs, posiciones*) {
+        enum := Err_VerificarEnumerable(enum, numArgs)
+        posiciones := Err_VerificarArg(posiciones, "posiciones", 3, FuncArg((l) => l.Length == 0 ? Util_CrearRango(numArgs) : l.LimpiarEnteros(1, numArgs, true), "Convertir", "Los valores de las posiciones no son válidos",Err_ValorArgError))
+        
+        resultado := Array()
+        valoresRef := Util_CrearListaRefs(numArgs)
+
+        while enum(valoresRef*) {
+            valores := Array()
+
+            for valorRef in valoresRef
+                valores.Push(%valorRef%?)
+
+            for posicion in posiciones
+                if valores.Has(posicion) {
+                    resultado.Push(valores)
+                    break    
+                }
+        }
+
+        return resultado
+    }
+
+    ; Se añade como método a Enumerator
+    Enumerator.Prototype.DefineProp("EliminarVacios", {Call: _Util_EliminarVaciosM})
+    global Util_EliminarVacios := _Util_EliminarVaciosM
 
 
     /*
@@ -718,30 +1112,55 @@ if (!IsSet(__UTIL_H__)) {
         @decripción Eliminar los valores duplicados de una lista. La lista se modifica quedando con los valores no duplicados. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referenci el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
 
         @param {Array} lista - Array a eliminar sus duplicados
-        @param {Boolean} final - Si true se eliminan los elementos duplicados empezando por el final quedando como único no duplicado el primero; si false se eliminan los elementos duplicados desde el principio quedando como único no duplicado el último.
-    */
-    _Util_EliminarDuplicadosMA(lista, final := true) {        
-        valoresDup := Map()
+        @param {Boolean} final - Si true se eliminan los elementos duplicados del final quedando como único no duplicado el primero; si false se eliminan los primeros elementos duplicados quedando como único no duplicado el último.
+        @param {Boolean} nuevo - Si se crea una nueva lista o solo se modifica la original.
 
-        if !!final {
+        @returns {Array} - Lista con los valores no duplicados.
+
+        @complexity O(n^2) siendo n el número de elementos de la lista, si se modifica la lista original. Si se crea una nueva lista, la complejidad es O(n).
+    */
+    _Util_EliminarDuplicadosMA(lista, final := true, nuevo := false) {        
+        valoresDup := Map()
+        valorIndef := {}  ; Al usarse la referencia como clave, es única para este objeto.
+
+        if !final ; Recorrer de fin a inicio: conservar la última aparición
+            indice := incBorrar := incNoBorrar := -1
+        else { ; Recorrer de inicio a fin: conservar la primera aparición
             indice := incNoBorrar := 1
             incBorrar := 0
         }
-        else
-            indice := incBorrar := incNoBorrar := -1
 
-        valorIndef := {}  ; Al usarse la referencia como clave, es única para este objeto.
-        Loop lista.Length {
-            valor := lista.Has(indice) ? lista[indice] : valorIndef
-            if !valoresDup.Has(valor) {
-                valoresDup[valor] := true
-                indice += incNoBorrar
-            }
-            else {
-                lista.RemoveAt(indice)
-                indice += incBorrar
+        if !nuevo {
+            Loop lista.Length {
+                valor := lista.Has(indice) ? lista[indice] : valorIndef
+                if !valoresDup.Has(valor) {
+                    valoresDup[valor] := true
+                    indice += incNoBorrar
+                }
+                else {
+                    lista.RemoveAt(indice)
+                    indice += incBorrar
+                }
             }
         }
+        else {
+            _lista := lista
+            lista := []
+            Loop _lista.Length {
+                valor := _lista.Has(indice) ? _lista[indice] : valorIndef
+                if !valoresDup.Has(valor) {
+                    valoresDup[valor] := true
+                    lista.Push(_lista.Has(indice) ? _lista[indice] : unset)
+                }
+
+                indice += incNoBorrar
+            }
+
+            if !final
+                lista.InvertirOrden()
+        }
+
+        return lista
     }
 
     ; Se añade como método a Array
@@ -751,22 +1170,39 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_EliminarDuplicadosMM
 
-        @decripción Eliminar los valores duplicados de un diccionario. El diccionario se modifica quedando con los valores no duplicados. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referenci el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
+        @decripción Eliminar los valores duplicados de un diccionario. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referencia el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
 
         @param {Map} dicc - Map a eliminar sus duplicados
+        @param {Boolean} nuevo - Si se crea un nuevo diccionario o solo se modifica el original.
+
+        @returns {Map} - Diccionario con los valores no duplicados.
     */
-    _Util_EliminarDuplicadosMM(dicc) {
+    _Util_EliminarDuplicadosMM(dicc, nuevo := false) {
         valoresDup := Map()
-        clavesBorrables := []
 
-        for clave, valor in dicc
-            if !valoresDup.Has(valor) {
-                clavesBorrables.Push(clave)
-                valoresDup[valor] := true
-            }
+        if !nuevo {
+            clavesBorrables := []
 
-        for clave in clavesBorrables
-            dicc.Delete(clave)
+            for clave, valor in dicc
+                if !valoresDup.Has(valor)
+                    valoresDup[valor] := true
+                else
+                    clavesBorrables.Push(clave)
+
+            for clave in clavesBorrables
+                dicc.Delete(clave)
+        }
+        else {
+            _dicc := dicc
+            dicc := Map()
+            for clave, valor in _dicc
+                if !valoresDup.Has(valor) {
+                    dicc[clave] := valor
+                    valoresDup[valor] := true
+                } 
+        }
+
+        return dicc
     }
 
     ; Se añade como método a Map
@@ -776,18 +1212,43 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_EliminarDuplicados
 
-        @decripción Eliminar los valores duplicados de un enum. El diccionario se modifica quedando con los valores no duplicados. Si los valores son objetos, no se compara su contenido; solo su referencia. Es decir, que si dos elementos tienen como referenci el mismo objeto, se considera duplicado, pero si tienen como referencia objetos distintos que tienen el mismo contenido, se consideran elementos no duplicados.
+        @description Eliminar los elementos duplicados de un enumerable. Se consideran elementos duplicados aquellos que tienen iguales en orden los valores en las posiciones indicadas de los argumentos.
 
-        @param {Map} dicc - Map a eliminar sus duplicados
+        @param {Object<__Enum>|Enumerator} enum - Objeto enumerable.
+        @param {Integer} numArgs - Número de argumentos que admitirá el enumerable.
+        @param {Integer} posiciones - Serie de posiciones de los argumentos de cada elemento del enumerable. Los valores de cada elemento del enumerable en orden en esas posiciones son los que se comparan. Si una posición de posiciones no está definida se ignora. Si se introducen posiciones repetidas, se considera solo la primera introducida. Si no se introduce ninguna posición, se comparan todos los valores del elemento del enumerable. Tener en cuenta que el valor de algún argumento puede no estar definido.
+
+        @throws {Err_TipoArgError|Err_MethodError} - Si hay algún error al verificar el enumerable.
+        @throws {Err_ValorArgError} - Si los valores de los argumentos no son válidos.
+
+        @return {Array} - Lista de elementos del enumerable no duplicados. Devuelve un array de arrays.
     */
     _Util_EliminarDuplicadosM(enum, numArgs, posiciones*) {
+        enum := Err_VerificarEnumerable(enum, numArgs)
+        posiciones := Err_VerificarArg(posiciones, "posiciones", 3, FuncArg((l) => l.Length == 0 ? Util_CrearRango(numArgs) : l.LimpiarEnteros(1, numArgs, true), "Convertir", "Los valores de las posiciones no son válidos", Err_ValorArgError))
+        
         valoresDup := Map()
+        resultado := Array()
+        valoresRef := Util_CrearListaRefs(numArgs)
 
-        for clave, valor in dicc
-            if !valoresDup.Has(valor)
-                valoresDup[valor] := true
-            else
-                dicc.Delete(clave)
+        while enum(valoresRef*) {
+            valores := Array()
+            subValores := Array()
+
+            for valorRef in valoresRef
+                valores.Push(%valorRef%?)
+
+            for posicion in posiciones
+                subValores.Push(valores.Has(posicion) ? valores[posicion] : unset)
+
+            hash := Util_Hash("PLANO", subValores*).Hash
+            if !valoresDup.Has(hash) {
+                valoresDup[hash] := true
+                resultado.Push(valores)
+            }
+        }
+
+        return resultado
     }
 
     ; Se añade como método a Enumerator
@@ -795,8 +1256,127 @@ if (!IsSet(__UTIL_H__)) {
     global Util_EliminarDuplicados := _Util_EliminarDuplicadosM
 
 
+
     /*
-        @class Util_MapOrdenado
+        @class Util_Hash
+
+        @description Clase para crear objetos que generan un hash (de varios tipos) a partir de varios valores.
+
+        @todo Mejorar la conversión a cadena de los float en HashPlano
+    */
+    class Util_Hash {
+        static __New() {
+            this._idObjeto := 1
+            this._objetosId := Map()
+            this.TIPO := Map("PLANO", 1, "MD5", 2, "SHA-1", 3, "SHA-2", 4, "SHA-3", 5)
+        }
+
+        /*
+            @constructor
+
+            @param {Integer|String} tipoHash - Tipo de algoritmo hash a aplicar. Se puede pasar el código entero o el nombre del tipo, ambos definidos en Util_Hash.TIPO
+            @param {Any} valores - sucesión de valores a ser agregados. Los valores no definidos serán ignorados.
+        */
+        __New(tipoHash, valores*) {
+            valores.EliminarVacios()
+            this._valores := valores
+            this.Tipo := tipoHash
+        }
+
+        /*
+            @method _HasPlano
+
+            @description Algoritmo hash plano que consiste en concatenar los valores almacenados en el objeto en una cadena resultante.
+
+            @returns {String} - Cadena resultante con el hash generado.
+        */
+        _HashPlano() {
+            resultado := ""
+            for valor in this._valores {
+                switch Type(valor) {
+                    case "String":
+                        resultado .= "S:" valor ":S"
+                    case "Integer":
+                        resultado .= "I:" String(valor) ":I"
+                    case "Float":
+                        resultado .= "F:" String(valor) ":F"
+                    case "Object":
+                        if !Util_Hash._objetosId.Has(valor)
+                            Util_Hash._objetosId[valor] := Util_Hash._idObjeto++
+                        resultado .= "O:" String(Util_Hash._objetosId[valor]) ":O"
+                    default:
+                        try
+                            resultado .= "D:" String(valor) ":D"
+                        catch as e
+                            throw TypeError.CrearErrorAHK("El valor #" A_Index "guardado no puede convertirse a cadena", , , , , e)
+                }
+            }
+
+            return resultado
+        }
+
+        /*
+            @method AgregarValor
+
+            @description Agregar valores que serán usados cuando se genere el hash.
+
+            @param {Any} valores - sucesión de valores a ser agregados. Los valores no definidos serán ignorados.
+        */
+        AgregarValor(valores*) {
+            valores.EliminarVacios()
+            this._valores.Push(valores*)
+        }
+
+        /*
+            @property Tipo
+
+            @description Obtener y modificar el tipo de algoritmo hash a aplicar.
+
+            @param {Integer|String} tipoHash - Tipo de algoritmo hash a aplicar. Se puede pasar el código entero o el nombre del tipo, ambos definidos en Util_Hash.TIPO
+
+            @returns {Integer} - Código del tipo hash guardado.
+        */
+        Tipo {
+            get => this._tipoHash
+
+            set {
+                if Util_Hash.TIPO.Has(value)
+                    this._tipoHash := Util_Hash.TIPO[value]
+                else {
+                    if !IsInteger(value) or !Util_Hash.TIPO.ContieneValor(value)
+                        throw Err_ValorArgError("El código del tipo de hash no es válido", , , , , , "Tipo", 1, value)
+
+                    this._tipoHash := Integer(value)
+                }
+            }
+        }
+
+        /*
+            @property Hash
+
+            @description Obtener el hash generado a partir de los valores almacenados en el objeto. El tipo de hash generado depende del valor asignado a la propiedad Tipo. Esta propiedad solo tiene la función get.
+
+            @return El hash generado.
+        */
+        Hash {
+            get {
+                switch this.Tipo {
+                    case Util_Hash.TIPO["PLANO"]:
+                        return this._HashPlano()
+                        
+                    case Util_Hash.TIPO["MD5"]:
+                    case Util_Hash.TIPO["SHA-1"]:
+                    case Util_Hash.TIPO["SHA-2"]:
+                    case Util_Hash.TIPO["SHA-3"]:
+                    default:
+                }
+            }
+        }
+    }
+
+
+    /*
+        @class Util_MapOrden
 
         @description 
 
@@ -804,63 +1384,46 @@ if (!IsSet(__UTIL_H__)) {
 
     */
     class Util_MapOrden extends Map {
+        static FACTOR_NM := 10  ; Número de veces de m a partir del cual se considera n mucho mayor que m.
+
         /*
-            @static Convertir
+            @static DesdeMap
 
-            @description Convertir un objeto Map a MapOrden. El objeto pasado queda modificado pasando a ser de tipo MapOrden
+            @description Obtener un objeto MapOrden a partir de un objeto Map. El objeto MapOrden obtenido puede ser el mismo objeto Map original modificado, o se puede crear uno completamente nuevo. En el caso de ser un objeto nuevo, aunque el diccionario Map se clona, sus valores no.
 
-            @param {Map} dicc - Diccionario Map a ser convertido.
-            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación. Si no se pasa función de comparación, el orden de los elementos es el orden en que se van introduciendo.
+            @param {Map} dicc - Diccionario Map a partir del cual obtener un objeto MapOrden
+            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación. Si no se pasa función de comparación, el orden de los elementos es el orden en que queden las claves obtenidas del Map original.
+            @param {Boolean} nuevo - Si se obtiene un objeto nuevo o solo se modifica el original.
 
-            @throws {Err_TipoArgError} - Si dicc no es Map o comparar no es Func.
-            @throws {Err_FuncError} - Si no puede ordenar las claves.
+            @throws {Err_TipoArgError} - Si no se pasa una función que admita dos argumentos para ser guardada.
+            @throws {MethodError} - Si hay error al reordenar las claves.
 
-            @returns {MapOrden} - El objeto Map convertido a MapOrden.
+            @returns {MapOrden} - El objeto MapOrden.
+
+            @complexity O(n) si no se pasa comparar; O(n*log(n)) si se pasa comparar. Siendo n el número de elementos en dicc.
         */
-        static Convertir(dicc, comparar?) {
-            Err_VerificarArg_Prv(dicc, "dicc", 1, Es_Map(d) => dicc is Map)
+        static DesdeMap(dicc, comparar?, nuevo := true) {
+            Err_VerificarArg_Prv(dicc, "dicc", 1, FuncArg.EsDicc)
 
             _base := dicc.Base
+            if nuevo
+                dicc := dicc.Clone()
             dicc.Base := this.Prototype
             dicc._claves := dicc.Claves()
+            
             if IsSet(comparar) {
-                ; Aquí No hay que preocuparse por meterlos en orden
                 try
                     dicc.Comparar := comparar
                 catch as e {
-                    dicc.Base := _base
-                    dicc._claves := unset
-                    if dicc.HasProp("_comparar")
-                        dicc._comparar := unset
+                    if !nuevo {
+                        dicc.Base := _base
+                        dicc._claves := unset
+                        if dicc.HasProp("_comparar")
+                            dicc._comparar := unset
+                    }
                     throw e
-                }
-                
+                }                
             }
-
-            return dicc
-        }
-
-        /*
-            @static Convertir
-
-            @description Crear un objeto MapOrden a partir de un objeto Map. El objeto MapOrden obtenido es nuevo, aunque los elementos del diccionario no se clonan.
-
-            @param {Map} dicc - Diccionario Map a partir del cual crear un MapOrden.
-            @param {Func} comparar - Función de comparación a ser usada por MapOrden. Tiene que admitir dos argumentos y devolver <0, 0 o >0 como resultado de la comparación.
-
-            @throws {Err_TipoArgError} - Si dicc no es Map o comparar no es Func.
-            @throws {Err_FuncError} - Si no puede ordenar las claves.
-
-            @returns {MapOrden} - El objeto MapOrden creado.
-        */
-        static Crear(dicc, comparar?) {
-            Err_VerificarArg_Prv(dicc, "dicc", 1, Es_Map(d) => dicc is Map)
-
-            dicc := dicc.Clone()
-            dicc.Base := this.Prototype
-            dicc._claves := dicc.Claves()
-            if IsSet(comparar)
-                dicc.Comparar := comparar
 
             return dicc
         }
@@ -868,11 +1431,13 @@ if (!IsSet(__UTIL_H__)) {
         /*
             @constructor
 
+            @param {Func} comparar - Función que admite dos valores a ser comparados. Devuelve <1, 0 o >1. Si no hay función de comparación, el orden del diccionario es el orden en que se meten las claves.
             @param {Object} args - lista de argumentos en orden clave y valor para ser guardados en el MapOrden. Misma estructura de argumentos que se pasan para crear un Map().
-            @param {Func} comparar - Función que admite dos valores a ser comparados. Devuelve <1, 0 o >1. Si no hay función de comparación, el orden del diccionario es el mismo como se metieron los valores.
 
             @throws {Err_ValorArgError} - Si los valores args no permiten crear el diccionario.
             @throws {Err_TipoArgError} - Si la función de comparación no es válida.
+
+            @complexity O(n) si no se pasa comparar; O(n*log(n)) si se pasa comparar. Siendo n el número de pares clave-valor
         */
         __New(comparar?, args*) {
             try
@@ -880,18 +1445,11 @@ if (!IsSet(__UTIL_H__)) {
             catch as e
                 throw Err_ValorArgError("No se han podido crear el diccionario", , , , , e, "args", 1, args)
 
-            if !IsSet(comparar) {
-                args.SubLista((i, v) => Mod(i, 2) == 1 and this.Has(v))
-                args.EliminarDuplicados(false) ; Otra opción es usar la función filtro.
-                this._claves := args
-            }
+            if !IsSet(comparar)
+                this._claves := args.Sub((i, v) => Mod(i, 2) == 1 and IsSet(v) and this.Has(v), true).EliminarDuplicados(false, true)
             else {
-                Err_VerificarArg_Prv(comparar, "comparar", 1, FuncArg.Admite2Args)
-                this._claves := this.Claves
-                try
-                    this._claves.Ordenar(comparar)
-                catch as e
-                    throw MethodError.CrearErrorAHK("No se han podido ordenar las claves", , , , , e)
+                this._claves := super.Claves()
+                this.Comparar := comparar
             }
         }
 
@@ -900,15 +1458,19 @@ if (!IsSet(__UTIL_H__)) {
             
             @description Obtener las claves ya ordenadas del diccionario. Este método sobrecarga a Claves de Map. Si se pasan valores, se obtienen las claves que estén asociadas a ese valor.
 
-            @param {Object} valor - Valores a ser comparado con los de cada clave.
+            @param {Any} valores - Valores a los que se les quiere obtener las claves.
 
             @returns {Array} - Array de claves obtenidas.
+
+            @complexity O(n) si no se pasa valores; O(n+m) si se pasan valores, donde n es el número de claves y m el número de valores.
         */
-        Claves(valor?) {
-            if IsSet(valor) {
+        Claves(valores*) {
+            if valores.Length > 0 {
                 _claves := []
+                valoresDicc := valores.InvertirIndicesValores()
+    
                 for clave in this._claves
-                    if this[clave] == valor
+                    if valoresDicc.Has(super[clave])
                         _claves.Push(clave)
 
                 return _claves
@@ -916,7 +1478,6 @@ if (!IsSet(__UTIL_H__)) {
  
             return this._claves.Clone()
         }
-
 
         /*
             @property Comparar
@@ -926,6 +1487,8 @@ if (!IsSet(__UTIL_H__)) {
             @throws {PropertyError} - Si al obtener la función con get no hay ninguna guardada.
             @throws {Err_TipoArgError} - Si no se pasa una función que admita dos argumentos para ser guardada.
             @throws {MethodError} - Si hay error al reordenar las claves.
+
+            @complexity O(n*log(n)) en set; O(1) en get. Siendo n el número de claves.
         */
         Comparar {
             get {
@@ -936,9 +1499,7 @@ if (!IsSet(__UTIL_H__)) {
             }
 
             set {
-                EF(f) => f is Func and f.AdmiteNumArgs(2)
-                EF.Mensaje := "No es función o no admite 2 argumentos"
-                Err_VerificarArg_Prv(value, "value", 1, Ef)
+                Err_VerificarArg_Prv(value, "value", 1, FuncArg.Admite2Args)
                 
                 this._comparar := value
                 try
@@ -955,6 +1516,11 @@ if (!IsSet(__UTIL_H__)) {
 
             @throws {MethodError} - Si hay error al reordenar las claves.
             @throws {Err_ValorArgError} - Si no se pueden guardar los valores como se haría en el Map.
+
+            @complexity Siendo n el número de claves ya guardadas y m el número de pares clave-valor de args:
+                - O(n + m) si no se pasa comparar.
+                - O((n + m) log m) => O(n + m log m) si se pasa comparar y n es mucho mayor que m [m * Util_MapOrden.FACTOR_NM < n]
+                - O(m + n log n) si se pasa comparar y n es similar a m [m * Util_MapOrden.FACTOR_NM > n]
         */
         Set(args*) {
             try
@@ -962,39 +1528,69 @@ if (!IsSet(__UTIL_H__)) {
             catch as e
                 throw Err_ValorArgError("No se han podido guardar los pares clave-valor", , , , , e, "args", 1, args)
 
-            args.SubLista((i, v) => Mod(i, 2) == 1 and IsSet(v))
+            argsClaves := args.Sub((i, v) => Mod(i, 2) == 1 and IsSet(v) and this.Has(v), true)
+
             try
                 comparar := this.Comparar
 
             if IsSet(comparar) {
-                try
-                    args.Ordenar(comparar)
-                catch as e
-                    throw MethodError.CrearErrorAHK("No se han podido ordenar las claves", , , , , e)
+                if argsClaves.Length * Util_MapOrden.FACTOR_NM > this._claves.Length { ; Versión más óptima cuando n no es mucho mayor que m
+                    this._claves := super.Claves()
+                    this._claves.Ordenar(comparar)
+                }
+                else { ; Versión más óptima cuando n >>> m (por ej, 10 veces mayor)
+                    argsClaves := argsClaves.EliminarDuplicados(false, true)
 
-                this._claves.Push(args*)
-                _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length-args.Length+1, this._claves.Length)
+                    try
+                        argsClaves.Ordenar(comparar)
+                    catch as e
+                        throw MethodError.CrearErrorAHK("No se han podido ordenar las claves recibidas", , , , , e)
+
+                    this._claves.Push(argsClaves*)
+                    this._claves := this._claves.EliminarDuplicados(false, true)
+
+                    try
+                        _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length-argsClaves.Length+1, this._claves.Length)
+                    catch as e
+                        throw MethodError.CrearErrorAHK("Error al combinar las claves", , , , , e)
+                }
             }
-            else
-                this._claves.Push(args*)
-                
-
+            else {
+                this._claves.Push(argsClaves*)
+                this._claves := this._claves.EliminarDuplicados(false, true)
+            }
         }
 
-        __Enum(numArgs) {
-            Va(n) => n == 1 or n == 2
-            Va.Mensaje := "El número de argumentos debe ser 1 o 2"
-            Err_VerificarArg_Prv(numArgs, "numArgs", 1, , Va)
+        /*
+            @method Enum
 
-            Enum(&clave, &valor?) {
+            @description Devolver una función que permite recorrer las claves del diccionario ordenadas. La función devuelve las claves y opcionalmente los valores asociados a las claves.
+
+            @param {Integer} numArgs - Número de argumentos que admitirá la función devuelta. Si es 1, solo se devuelven las claves. Si es 2, se devuelven las claves y los valores asociados.
+
+            @throws {Err_ValorArgError} - Si el número de argumentos no es 1 o 2.
+
+            @returns {Func} - Función que permite recorrer las claves del diccionario ordenadas.
+
+            @complexity O(1).
+        */
+        __Enum(numArgs) {
+            Err_VerificarArg_Prv(numArgs, "numArgs", 1, , FuncArg((n) => n == 1 or n == 2, "Validar", "El número de argumentos tiene que ser 1 o 2"))
+
+            Enum(claveRef?, valorRef?) {
                 static indice := 1
 
                 if this.Count < indice or this._claves.Length < indice
                     return false
 
-                clave := this._claves[indice++]
-                if IsSet(valor)
-                    valor := this[clave]
+                if IsSet(claveRef) {
+                    Err_VerificarArg_Prv(claveRef, "claveRef", 1, FuncArg.EsReferencia)
+                    %claveRef% := this._claves[indice++]
+                }
+                if IsSet(valorRef) {
+                    Err_VerificarArg_Prv(valorRef, "valorRef", 2, FuncArg.EsReferencia)
+                    %valorRef% := this[%claveRef%]
+                }
 
                 return true
             }
@@ -1010,28 +1606,82 @@ if (!IsSet(__UTIL_H__)) {
             @param {Object} - Clave a borrar.
 
             @throws {UnsetItemError} - Si la clave a borrar no existe.
+
+            @complexity O(n) siendo n el número de claves.
         */
         Delete(clave) {
-            indices := this._claves.IndicesConValor(clave)
-            if indices.Length == 0
-                mensaje := "No existe la clave en la lista ordenada de claves"
-            else
-                try
-                    super.Delete(clave)
-                catch as e
-                    mensaje := "No existe la clave en el diccionario"
+            try
+                valor := super.Delete(clave)
+            catch as e
+                throw UnsetItemError.CrearErrorAHK("No existe la clave en el diccionario", , , , , e)
 
-            if IsSet(mensaje)
-                throw UnsetItemError.CrearErrorAHK(mensaje, , , , , e?)
-            
-            this._claves.RemoveAt(indices[1])
+            this._claves.RemoveAt(this._claves.BuscarValor(clave, this.Comparar))
+
+            return valor
         }
 
+        /*
+            @method Clear
+
+            @description Similar al método Clear de Map, pero eliminando también todas las claves de la ordenación de claves
+
+            @complexity O(n) siendo n el número de claves.
+        */
         Clear() {
             super.Clear()
             this._claves := []
         }
+
+        /*
+            @method Clone
+
+            @description Clonar el objeto MapOrden. Se clona el diccionario y las claves.
+
+            @returns {MapOrden} - Clon del objeto MapOrden.
+
+            @complexity O(n) siendo n el número de claves.
+        */
+        Clone() {
+            _this := this.Clone()
+            _this._claves := this.Claves()
+
+            return _this
+        }
+        
+        /*
+            @method ToString
+
+            @description Devuelve una representación en cadena del objeto MapOrden.
+
+            @param {String} sepGrupo - cadena para separar los pares clave-valor.
+            @param {String} sepPartes - cadena para separar cada clave de cada valor.
+
+            @returns {String} - Representación en cadena del objeto MapOrden.
+
+            @complexity O(n) siendo n el número de claves.
+        */
+        ToString(sepGrupo := ";", sepPartes := ":") {
+            cadena := ""
+            for clave in this._claves
+                try
+                    cadena .= String(clave)
+                catch
+                    cadena .= "<No String>"
+                
+                cadena .= sepPartes " "
+
+                try
+                    cadena .= this[clave]
+                catch
+                    cadena .= "<No String>"
+
+                cadena .= sepGrupo " "
+
+            return RTrim(cadena, sepGrupo " ")
+        }
     }
+
+
 
     /*
         @class MapPrioridad
@@ -1101,72 +1751,6 @@ if (!IsSet(__UTIL_H__)) {
         ToString() {
 
         }
-    }
-
-
-    /*
-        @function Util_ContieneValor
-        @description Comprueba si una serie de valores coinciden con valores de algún elemento de un objeto enumerable.
-
-        @param {Enumerator|Object<__Enum>} enum - Objeto enumerable donde comprobar el valor
-        @param {Integer} numArgs - Número de argumentos >= 1 que admite el enumerable por cada elemento.
-        @param {Integer, Object} pos_valor - Serie de pares de argumentos (posición, valor). Se indica, para cada posición de los argumentos del enumerable, el valor que tiene que contener.
-
-        @returns {Boolean} - true o false si el elemento está o no dentro de la lista.
-
-        @throws {Err_TipoArgError} - Si el tipo de algún argumento es incorrecto.
-        @throws {Err_ValorArgError} - Si el valor de algún argumento no es válido.
-    */
-    _Util_ContieneValor(enum, numArgs, pos_valor*) {
-        enum := Err_VerificarEnumerable(enum, numArgs)
-           
-        if Ceil(pos_valor.Length / 2) > numArgs {
-            m := "El número de valores debe ser <= numArgs"
-            throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor", 3, pos_valor)
-        }
-
-        if numArgs == 0
-            return false
-
-        valoresRef := Array()
-        Loop numArgs
-            valoresRef.Push(Util_CrearVarRef())
-
-        while enum(valoresRef*) {
-            coincide := true
-            Loop pos_valor.Length {
-                posArg := pos_valor[A_Index]
-
-                if !IsInteger(posArg) {
-                    m := "La posición debe ser un entero"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_TipoArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg, Type(posArg))
-                }
-
-                posArg := Integer(posArg)
-
-                if posArg > numArgs or posArg < 1 {
-                    m := "La posición debe estar entre 1 y numArgs"
-                    throw !Err_ErroresPersonalizadosActivo ? Error(m) : Err_ValorArgError(m , , , , , , "pos_valor[" A_Index "]", 2 + A_Index, posArg)
-                }
-
-                if !((!IsSetRef(valoresRef[posArg]) and !pos_valor.Has(++A_Index)) or (IsSetRef(valoresRef[posArg]) and pos_valor.Has(A_Index) and %valoresRef[posArg]% == pos_valor[A_Index])) {
-                    coincide := false
-                    break
-                }
-            }
-
-            if coincide                    
-                return true
-        }
-
-        return false
-    }
-
-    ; Se añade Util_ContieneValor como método a Map y Array
-    Enumerator.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
-    Map.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(2, 2, v)})
-    Array.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(1, 1, v)})
-    global Util_ContieneValor := _Util_ContieneValor
-   
+    }   
 }
 
