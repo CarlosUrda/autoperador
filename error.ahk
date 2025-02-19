@@ -148,7 +148,7 @@ if (!IsSet(__ERR_H__))
         inc := !!recibeThis
 
         if posArgs.Lenght == 0
-            posArgs := Util_CrearLista(funcion.MaxParams - inc)
+            posArgs := Util_CrearRango(funcion.MaxParams - inc)
 
         resultado := Map()
         for posArg in posArgs {
@@ -805,7 +805,7 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si la posición del argumento es < 1 o la fecha está en formato incorrecto.
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["FUNCION"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?, funcion?) {
+        __New(mensaje, what?, extra?, codigo := Err_Error.ERRORES["FUNCION"], fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?, funcion?) {
             super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?, nombreArg?, posArg?, valorArg?)
 
             Err_ErroresPersonalizadosActivo := false
@@ -815,7 +815,7 @@ if (!IsSet(__ERR_H__))
 
             Err_ErroresPersonalizadosActivo := true
         }
-
+        
         /*
             @method ToString
 
@@ -851,7 +851,7 @@ if (!IsSet(__ERR_H__))
             @throws {TypeError} - Si los argumentos no tienen tipos correctos
             @throws {ValueError} - Si el número de argumentos no es un entero >= 0
         */
-        __New(mensaje, what?, extra?, codigo := ERR_ERRORES["NUM_ARGS"], fecha?, errorPrevio?, funcion?, numArgs?) {
+        __New(mensaje, what?, extra?, codigo := Err_Error.ERRORES["NUM_ARGS"], fecha?, errorPrevio?, funcion?, numArgs?) {
             super.__New(mensaje, what?, extra?, codigo, fecha?, errorPrevio?, funcion?)
 
             Err_ErroresPersonalizadosActivo := false

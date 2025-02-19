@@ -961,7 +961,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @param {Array} lista - Lista ordenada donde buscar el valor.
         @param {Any} valor - Valor a buscar.
-        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0.
+        @param {Func} comparar - Función de comparación de un par de valores. Devuelve <0, 0 o >0. En búsqueda lineal solo se usa 0 o !0 (valores iguales o no)
         @param {Boolean} binaria - Indica si se realiza una búsqueda binaria (funciona en listas ya ordenadas). Si no, se realiza una busqueda secuencial.
         @param {Integer} inicio - Posición del primer elemento de la sublista.
         @param {Integer} fin - Posición del último elemento de la sublista.
@@ -970,7 +970,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @complexity O(log n) siendo n el número de elementos de la lista, si la búsqueda es binaria en una lista ordenada; O(n) si la búsqueda es secuencial.
     */
-    _Util_BuscarValorM(lista, valor, binaria := true, comparar := (a, b) => StrCompare(String(a), String(b), true), inicio := 1, fin := lista.Length) {
+    _Util_BuscarValorM(lista, valor, comparar := (a, b) => StrCompare(String(a), String(b), true), binaria := true, inicio := 1, fin := lista.Length) {
         if lista.Length == 0
             return 0
         Err_VerificarArg_Prv(comparar, "comparar", 3, FuncArg.EsLlamable)
@@ -1550,7 +1550,7 @@ if (!IsSet(__UTIL_H__)) {
                     this._claves := this._claves.EliminarDuplicados(false, true)
 
                     try
-                        _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length-argsClaves.Length+1, this._claves.Length)
+                        _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length - argsClaves.Length + 1, this._claves.Length)
                     catch as e
                         throw MethodError.CrearErrorAHK("Error al combinar las claves", , , , , e)
                 }
@@ -1558,6 +1558,47 @@ if (!IsSet(__UTIL_H__)) {
             else {
                 this._claves.Push(argsClaves*)
                 this._claves := this._claves.EliminarDuplicados(false, true)
+            }
+        }
+
+        /*
+            @method __Item
+
+            @description Similar al método __Item de Map, pero reordenando las claves.
+
+            @throws {Err_ValorArgError} - Si no se pueden guardar los valores como se haría en el Map.
+            @throws {MethodError} - Si hay error al combinar las claves.
+
+            @complexity O(n) siendo n el número de claves ya guardadas, con o sin función de comparar.
+        */
+        __Item[clave] {
+            set {
+                try
+                    super[clave] := value
+                catch as e
+                    throw Err_ValorArgError("No se ha podido guarda el par clave-valor", , , , , e, "value", 1, value)
+    
+                try
+                    comparar := this.Comparar
+    
+                if IsSet(comparar) {
+                    if this._claves.BuscarValor(clave, comparar, true) == 0 {
+                       this._claves.Push(clave)
+                        try
+                            _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length, this._claves.Length)
+                        catch as e
+                            throw MethodError.CrearErrorAHK("Error al combinar las claves", , , , , e)
+                    }
+                }
+                else {
+                    indice := this._claves.BuscarValor(clave, (v1, v2) => !(v1 == v2), false)
+                    if indice == 0
+                        this._claves.Push(clave)
+                    else if indice < this._claves.Length {
+                        this._claves.RemoveAt(indice)
+                        this._claves.Push(clave)
+                    }
+                }
             }
         }
 
@@ -1647,7 +1688,34 @@ if (!IsSet(__UTIL_H__)) {
 
             return _this
         }
-        
+
+        /*
+            @property Valor
+
+            @description Propiedad para acceder a los valores del diccionario por posición de clave ordenada. Se lanza UnsetItemError si no existe la clave en esa posición.
+
+            @param {Integer} posClave - Posición de la clave en la ordenación de claves. 1 accede a la primera clave y -1 accede a la última.
+
+            @throws {UnsetItemError} - Si no existe la clave en esa posición.
+
+            @complexity O(1).
+        */      
+        Valor[posClave] {
+            get {
+                try
+                    return this[this._claves[posClave]]
+                catch as e
+                    throw UnsetItemError.CrearErrorAHK("No existe clave en esa posición", , , , , e)
+           }
+
+            set {
+                try
+                    return this[this._claves[posClave]] := value
+                catch as e
+                    throw UnsetItemError.CrearErrorAHK("No existe clave en esa posición", , , , , e)
+            }
+        }
+
         /*
             @method ToString
 
@@ -1681,6 +1749,37 @@ if (!IsSet(__UTIL_H__)) {
         }
     }
 
+
+    class Util_ArbolMapOrden {
+
+        class Hoja {
+            __New(valor) {
+                this._valor := valor
+            }
+        }
+        
+        __New(dicc?, clonar := true) {
+ 
+           this._raiz := Util_MapOrden()
+            
+            if IsSet(dicc) {
+                if dicc is Map {
+                    for clave, valor in dicc
+                        this._raiz[clave] := (valor is Map) ? valor : Util_ArbolMapOrden.Hoja(valor)
+ 
+                }
+                if dicc is Util_MapOrden
+                    this._raiz := dicc.Clone()
+                else if dicc is Map
+                    this._raiz := Util_MapOrden.DesdeMap(dicc)
+                else
+                    throw Err_TipoArgError("El argumento no es un diccionario válido", , , , , , "dicc", 1, dicc)
+            }
+
+            this._raiz := Util_MapOrden()
+ 
+        }
+    }
 
 
     /*
