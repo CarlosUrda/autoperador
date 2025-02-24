@@ -1256,6 +1256,31 @@ if (!IsSet(__UTIL_H__)) {
     global Util_EliminarDuplicados := _Util_EliminarDuplicadosM
 
 
+    /*
+        @function Util_CadenaALista
+
+        @description Convertir una cadena en una lista. Se puede indicar el separador de los elementos de la cadena. Si no se indica, se considera que el separador es el punto.
+
+        @param {String} cadena - Cadena a convertir en lista.
+        @param {String} separador - Separador de los elementos de la cadena.
+
+        @returns {Array} - Lista con los elementos de la cadena.
+    */
+    Util_CadenaALista(cadena, separador := ".") {
+        cadena := Err_VerificarArg(cadena, "cadena", 1, FuncArg((s) => Trim(String(s)), "Convertir", "El argumento debe ser una cadena"))
+        separador := Err_VerificarArg(separador, "separador", 2, FuncArg.Cadena)
+
+        try
+            lista := StrSplit(cadena, separador)
+        catch as e
+            throw Err_TipoArgError("El argumento no es una cadena válida", , , , , e, "cadena", 1, cadena, Type(cadena))
+
+        for indice, valor in lista
+            lista[indice] := Trim(valor)
+
+        return lista
+    }
+
 
     /*
         @class Util_Hash
@@ -1519,7 +1544,7 @@ if (!IsSet(__UTIL_H__)) {
 
             @complexity Siendo n el número de claves ya guardadas y m el número de pares clave-valor de args:
                 - O(n + m) si no se pasa comparar.
-                - O((n + m) log m) => O(n + m log m) si se pasa comparar y n es mucho mayor que m [m * Util_MapOrden.FACTOR_NM < n]
+                - O((n + m) log m) => O(n + m log m) si se pasa comparar y n es mucho mayor que m [m * Util_MapOrden.FACTOR_NM < n] o m == 1.
                 - O(m + n log n) si se pasa comparar y n es similar a m [m * Util_MapOrden.FACTOR_NM > n]
         */
         Set(args*) {
@@ -1534,11 +1559,11 @@ if (!IsSet(__UTIL_H__)) {
                 comparar := this.Comparar
 
             if IsSet(comparar) {
-                if argsClaves.Length * Util_MapOrden.FACTOR_NM > this._claves.Length { ; Versión más óptima cuando n no es mucho mayor que m
+                if argsClaves.Length > 1 and argsClaves.Length * Util_MapOrden.FACTOR_NM > this._claves.Length { ; Versión más óptima cuando n no es mucho mayor que m
                     this._claves := super.Claves()
                     this._claves.Ordenar(comparar)
                 }
-                else { ; Versión más óptima cuando n >>> m (por ej, 10 veces mayor)
+                else { ; Versión más óptima cuando n >>> m (por ej, 10 veces mayor) o m == 1
                     argsClaves := argsClaves.EliminarDuplicados(false, true)
 
                     try
@@ -1583,7 +1608,7 @@ if (!IsSet(__UTIL_H__)) {
     
                 if IsSet(comparar) {
                     if this._claves.BuscarValor(clave, comparar, true) == 0 {
-                       this._claves.Push(clave)
+                        this._claves.Push(clave)
                         try
                             _Util_Combinar_Prv(this._claves, comparar, 1, this._claves.Length, this._claves.Length)
                         catch as e
@@ -1753,9 +1778,7 @@ if (!IsSet(__UTIL_H__)) {
     class Util_ArbolMapOrden {
 
         class Hoja {
-            __New(valor) {
-                this._valor := valor
-            }
+            __New(valor) => this._valor := valor
         }
         
         __New(dicc?, clonar := true) {
@@ -1778,6 +1801,124 @@ if (!IsSet(__UTIL_H__)) {
 
             this._raiz := Util_MapOrden()
  
+        }
+
+        Set(args*) {
+            this._raiz.Set(args*)
+        }
+
+        static _DiccClaveValor(nodo) {
+
+        }
+
+        __Item[clave] {
+            get {
+                subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+
+                if subClaves.Length == 0
+                    throw UnsetItemError.CrearErrorAHK("Tienes que pasara alguna clave")
+
+                nodo := this._raiz
+
+                for subClave in subClaves {
+                    if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClave)
+                        throw UnsetItemError.CrearErrorAHK("No existe el campo " subClave " de " clave " en el árbol")
+
+                    if subClaves.Length == A_Index {
+                        ; Obtener diccionario con todos los valores a partir de nodo[subClave]
+                    }
+
+                    nodo := nodo[subClave]
+                }
+
+            }
+
+            set {
+                for clave in Util_CadenaALista(claves, ".")
+                    this._raiz[clave] := value
+            }
+        }
+
+        /*
+            @method _Delete
+
+            @description Borrar la clave a partir de un nodo del árbol. Las subclaves que queden vacías al borrar la última subClave también se eliminan. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+
+            @param {MapOrden} nodo - Nodo del árbol.
+            @param {Array} subClaves - Listado con las subclaves de la clave completa a borrar.
+            @param {Integer} indice - Índice de la subClave dentro de subClaves que tiene que encontrarse en el nodo actual.
+            @param {Boolean} borrarNodo - Si true se puede borrar cualquier tipo de nodo; si false solo se pueden borrar hojas y no nodos intermedios.
+
+            @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo resultante de borrar la clave.
+
+            @throws {UnsetItemError} - Si no existe la clave en el árbol; si no se puede borrar un nodo que no es hoja.
+
+            @complexity O(n) siendo n el número de claves.
+        */
+        static _Delete_Prv(nodo, subClaves, indice, borrarNodo := false) {
+            if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClaves[indice])
+                throw UnsetItemError.CrearErrorAHK("No existe el campo " subClaves[indice] " de " subClaves.ToString(1, ".") " clave en el árbol")
+
+            if subClaves.Length == indice {
+                if !borrarNodo and !(nodo[subClaves[indice]] is Util_ArbolMapOrden.Hoja)
+                    throw UnsetItemError.CrearErrorAHK("No se puede borrar un nodo que no es hoja")
+                    
+                return nodo.Delete(subClaves[indice])
+            }
+
+            nodoHijo := nodo[subClaves[indice]]
+            nodoBorrado := Util_ArbolMapOrden._Delete_Prv(nodoHijo, subClaves, indice + 1, borrarNodo)
+            if nodoHijo.Count == 0
+                nodo.Delete(subClaves[indice])
+
+            return nodoBorrado
+        }
+
+        /*
+            @method Delete
+
+            @description Borrar la clave a partir de la raíz del árbol. Las subclaves que queden vacías al borrar la última subClave también se eliminan.
+
+            @param {String} clave - Clave a borrar: subclaves separadas por puntos.
+            @param {Boolean} borrarNodo - Si true se puede borrar cualquier tipo de nodo; si false solo se pueden borrar hojas y no nodos intermedios.
+
+            @throws {UnsetItemError} - Si no existe la clave en el árbol; si no se puede borrar la raíz del árbol; si no se puede borrar un nodo que no es hoja.
+
+            @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo resultante de borrar la clave.
+
+            @complexity O(n) siendo n el número de claves.
+        */
+        Delete(clave, borrarNodo := false) {
+            subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+
+            if subClaves.Length == 0
+                throw UnsetItemError.CrearErrorAHK("No se puede borrar la raíz del árbol. Tienes que pasara alguna clave")
+
+            return Util_ArbolMapOrden._Delete_Prv(this._raiz, subClaves, 1, borrarNodo)
+        }
+
+        /*
+            @method _Buscar_Prv
+
+            @description Busca un valor en el árbol dado una clave.
+
+            @param {String} subClave - La clave para buscar.
+
+            @returns {Mixed} - El valor encontrado o null si no existe.
+        */
+        static _Buscar_Prv(nodo, subClave) {
+            if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClaves[indice])
+                return null
+
+            if subClaves.Length == indice
+                return nodo[subClaves[indice]]._valor
+            else
+                return Util_ArbolMapOrden._Buscar_Prv(nodo[subClaves[indice]], subClaves, indice + 1)
+        }
+
+        Find(clave) {
+            subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+            return Util_ArbolMapOrden._Buscar_Prv(this._raiz, subClaves, 1)
         }
     }
 
