@@ -1755,7 +1755,7 @@ if (!IsSet(__UTIL_H__)) {
         */
         ToString(sepGrupo := ";", sepPartes := ":") {
             cadena := ""
-            for clave in this._claves
+            for clave in this._claves {
                 try
                     cadena .= String(clave)
                 catch
@@ -1769,6 +1769,7 @@ if (!IsSet(__UTIL_H__)) {
                     cadena .= "<No String>"
 
                 cadena .= sepGrupo " "
+            }
 
             return RTrim(cadena, sepGrupo " ")
         }
@@ -1803,16 +1804,82 @@ if (!IsSet(__UTIL_H__)) {
  
         }
 
+        /*
+            @method Set
+    
+            @description Guardar una serie de valores en el árbol. Se pasa como argumentos los pares clave valor. Si una clave o valor no esá definido, se ignora.
+
+            @param {String|Any} args - Pares clave valor a guardar en el árbol.
+
+            @complexity O(n * m) siendo n el número de pares clave-valor y m el número de subclaves.
+        */
         Set(args*) {
-            this._raiz.Set(args*)
+            Loop args.Length // 2
+                if args.Has(A_Index) and args.Has(A_Index + 1)
+                   this[args[A_Index]] := args[A_Index + 1]
         }
 
-        static _DiccClaveValor(nodo) {
+        /*
+            @method _ObtenerValores_Prv
 
+            @description Obtener un diccionario ordenado MapOrden con todos los valores a partir de un nodo del árbol. Las claves del diccionario son la clave completa en el árbol para cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+
+            @param {MapOrden} nodo - Nodo del árbol.
+            @param {String} clave - Clave (subclaves separadas por puntos) en el árbol del nodo.
+            
+            @returns {MapOrden} - Un diccionario ordenado con todos los valores.
+
+            @complexity O(n) siendo n el número de nodos del árbol.
+       */
+        static _ObtenerValores_Prv(nodo, clave) {
+            valores := Util_MapOrden(StrCompare)
+            pilaNodos := Util_MapOrden( , clave, nodo)
+            
+            for _clave, _nodo in pilaNodos {
+                if _nodo is Util_ArbolMapOrden.Hoja
+                    valores[_clave] := _nodo._valor
+                else
+                    for subClave, subNodo in _nodo
+                        pilaNodos[clave "." subClave] := subNodo
+            }
+
+            return valores
         }
 
+        /*
+            @property Item
+
+            @description Propiedad para acceder a los valores del árbol a partir de una clave. Si la clave no existe, se lanza UnsetItemError.  
+
+            @param {String} clave - Clave en el árbol. Las subclaves se separan por puntos.
+
+            @returns {Any\MapOrden} - En set devuelve el valor que se acaba de guardar en la clave; en get devuelve un diccionario ordenado por claves con todos los valores bajo esa clave. 
+
+            @throws {UnsetItemError} - Si no existe la clave en el árbol.
+
+            @complexity en set O(m) siendo m el número de subclaves; en get O(n) siendo n el número de nodos del árbol.
+        */
         __Item[clave] {
             get {
+                subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+
+                if subClaves.Length == 0
+                    throw UnsetItemError.CrearErrorAHK("Tienes que pasar alguna clave")
+
+                nodo := this._raiz
+
+                for subClave in subClaves {
+                    if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClave)
+                        throw UnsetItemError.CrearErrorAHK("No existe el campo " subClave " de " clave " en el árbol")
+
+                    if subClaves.Length == A_Index
+                        return Util_ArbolMapOrden._ObtenerValores_Prv(nodo[subClave], clave)
+
+                    nodo := nodo[subClave]
+                }
+            }
+
+            set {
                 subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
 
                 if subClaves.Length == 0
@@ -1821,21 +1888,20 @@ if (!IsSet(__UTIL_H__)) {
                 nodo := this._raiz
 
                 for subClave in subClaves {
-                    if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClave)
-                        throw UnsetItemError.CrearErrorAHK("No existe el campo " subClave " de " clave " en el árbol")
+                    if nodo is Util_ArbolMapOrden.Hoja
+                        throw UnsetItemError.CrearErrorAHK("No se puede asignar un nodo en una clave que ya tiene un valor")
 
-                    if subClaves.Length == A_Index {
-                        ; Obtener diccionario con todos los valores a partir de nodo[subClave]
+                    if subClaves.Length == A_Index
+                        nodo[subClave] := Util_ArbolMapOrden.Hoja(value)
+                    else {
+                        if !nodo.Has(subClave)
+                            nodo[subClave] := Util_MapOrden(StrCompare)
+                        
+                        nodo := nodo[subClave]
                     }
-
-                    nodo := nodo[subClave]
                 }
-
-            }
-
-            set {
-                for clave in Util_CadenaALista(claves, ".")
-                    this._raiz[clave] := value
+                
+                return value
             }
         }
 
@@ -1846,14 +1912,14 @@ if (!IsSet(__UTIL_H__)) {
 
             @param {MapOrden} nodo - Nodo del árbol.
             @param {Array} subClaves - Listado con las subclaves de la clave completa a borrar.
-            @param {Integer} indice - Índice de la subClave dentro de subClaves que tiene que encontrarse en el nodo actual.
+            @param {Integer} indice - Índice de la subClave dentro de subClaves a partir de la cual se comprueba desde el nodo actual.
             @param {Boolean} borrarNodo - Si true se puede borrar cualquier tipo de nodo; si false solo se pueden borrar hojas y no nodos intermedios.
 
             @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo resultante de borrar la clave.
 
             @throws {UnsetItemError} - Si no existe la clave en el árbol; si no se puede borrar un nodo que no es hoja.
 
-            @complexity O(n) siendo n el número de claves.
+            @complexity O(n) siendo n el número de subclaves.
         */
         static _Delete_Prv(nodo, subClaves, indice, borrarNodo := false) {
             if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClaves[indice])
@@ -1886,7 +1952,7 @@ if (!IsSet(__UTIL_H__)) {
 
             @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo resultante de borrar la clave.
 
-            @complexity O(n) siendo n el número de claves.
+            @complexity O(n) siendo n el número de subclaves de clave.
         */
         Delete(clave, borrarNodo := false) {
             subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
