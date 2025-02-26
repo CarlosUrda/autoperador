@@ -1819,7 +1819,7 @@ if (!IsSet(__UTIL_H__)) {
                    this[args[A_Index]] := args[A_Index + 1]
         }
 
-        /*
+       /*
             @method _ObtenerValores_Prv
 
             @description Obtener un diccionario ordenado MapOrden con todos los valores a partir de un nodo del árbol. Las claves del diccionario son la clave completa en el árbol para cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
@@ -1827,11 +1827,36 @@ if (!IsSet(__UTIL_H__)) {
             @param {MapOrden} nodo - Nodo del árbol.
             @param {String} clave - Clave (subclaves separadas por puntos) en el árbol del nodo.
             
-            @returns {MapOrden} - Un diccionario ordenado con todos los valores.
+            @returns {MapOrden} - Un diccionario ordenado con todos los valores (aunque sin función de comparación porque las claves se fueron metiendo en orden)
 
             @complexity O(n) siendo n el número de nodos del árbol.
        */
-        static _ObtenerValores_Prv(nodo, clave) {
+        static _ObtenerValoresRec_Prv(nodo, clave) {
+            static valores := Util_MapOrden()
+            
+            if nodo is Util_ArbolMapOrden.Hoja
+                valores[clave] := nodo._valor
+            else
+                for subClave, subNodo in nodo
+                    Util_ArbolMapOrden._ObtenerValoresRec_Prv(subNodo, clave "." subClave)
+
+            return valores
+        }
+
+
+        /*
+            @method _ObtenerValoresIter_Prv
+
+            @description Obtener un diccionario ordenado MapOrden con todos los valores a partir de un nodo del árbol. Cada clave del diccionario obtenido es una clave completa del árbol asociado con su valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+
+            @param {MapOrden} nodo - Nodo del árbol.
+            @param {String} clave - Clave (subclaves separadas por puntos) en el árbol del nodo.
+            
+            @returns {MapOrden} - Un diccionario ordenado con todos los valores.
+
+            @complexity O(n * log n) siendo n el número de nodos del árbol.
+       */
+        static _ObtenerValoresIter_Prv(nodo, clave) {
             valores := Util_MapOrden(StrCompare)
             pilaNodos := Util_MapOrden( , clave, nodo)
             
