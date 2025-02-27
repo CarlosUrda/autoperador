@@ -184,7 +184,7 @@ if (!IsSet(__ERR_H__))
 
         @returns Enumerator obtenido a partir de enum. Queda definido el número de argumentos que admite por numArgs.
 
-        @throws {Err_MethodError} - Si se lanza algún error al ejecutar enum.__Enum.
+        @throws {MethodError} - Si se lanza algún error al ejecutar enum.__Enum.
         @throws {Err_TipoArgError} - Si el objeto devuelto por __Enum, o el propio enum en su defecto, no es llamable o no admite el número de argumentos numArgs (todos por referencia).
 
         @todo Comprobar que el enumerator no va a ejecutar ningún tipo de código malicioso.
