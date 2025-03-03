@@ -1831,16 +1831,15 @@ if (!IsSet(__UTIL_H__)) {
        /*
             @method _ObtenerValoresProf_Prv
 
-            @description De manera recursiva en profundida, obtener un diccionario ordenado MapOrden con todos los valores a partir de un nodo del árbol. Cada clave del diccionario devuelta en el diccionario es una clave completa del árbol asociado con cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+            @description De manera recursiva en profundida, obtener un diccionario ordenado MapOrden con todos los valores a partir de los nodos del árbol. Cada clave del diccionario devuelta en el diccionario es una clave completa del árbol asociado con cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
 
-            @param {MapOrden} nodo - Nodo del árbol.
-            @param {String} clave - Clave (subclaves separadas por puntos) en el árbol del nodo.
+            @param {MapOrden} args - pares de valores Clave-Nodo. El nodo es el punto a partir del cual obtener todos los valores por debajo de él, y la clave es la localización (lista de subclaves) de ese nodo en el árbol.
             
-            @returns {MapOrden} - Un diccionario MapOrden (sin función de comparación asignada) con todos los valores a partir del nodo. Cada clave asociada con cada valor es la clave completa en el árbol. El orden de las claves es el mismo en el que se encuentran los valores a partir del nodo al realizar una búsqueda en profundidad DFS eligiendo en cada nivel los nodos en el orden en que están en el árbol.
+            @returns {MapOrden} - Un diccionario MapOrden (sin función de comparación asignada) con todos los valores a partir de los nodos en el orden metidos. Cada clave asociada con cada valor es la clave completa en el árbol. El orden de las claves obtenidas en cada nodo es el mismo en el que se encuentran los valores a partir del nodo al realizar una búsqueda en profundidad DFS eligiendo en cada nivel los nodos en el orden en que están en el árbol.
 
             @complexity O(n) siendo n el número de nodos del árbol bajo el nodo.
        */
-        static _ObtenerValoresProf_Prv(nodo, clave) {
+        static _ObtenerValoresProf_Prv(args*) {
             static valores := Util_MapOrden()
             static primeraLlamada := true
 
@@ -1849,13 +1848,23 @@ if (!IsSet(__UTIL_H__)) {
                 primeraLlamada := false
             }
             
-            if nodo is Util_ArbolMapOrden.Hoja
-                valores[clave] := nodo._valor
-            else
-                for subClave, subNodo in nodo
-                    Util_ArbolMapOrden._ObtenerValoresRec_Prv(subNodo, clave "." subClave)
+            Loop args.Length // 2 {
+                clave := args[A_Index].ToString(1, ".")
+                nodo := args[A_Index + 1]
+ 
+                if nodo is Util_ArbolMapOrden.Hoja
+                    valores[clave] := nodo._valor
+                else {
+                    _args := []
+                    for subClave, subNodo in nodo
+                        _args.Push(clave "." subClave, subNodo)
+                    
+                    ; Se puede meter esta llamada en el for y evitar crear el array.
+                    Util_ArbolMapOrden._ObtenerValoresProf_Prv(_args*)
+                }
+            }
 
-            if IsSet(_primeraLlamada){
+            if IsSet(_primeraLlamada) { ; Se resetea para nuevas llamadas
                 primeraLlamada := true
                 _valores := valores
                 valores := Util_MapOrden()
@@ -1868,28 +1877,51 @@ if (!IsSet(__UTIL_H__)) {
         /*
             @method _ObtenerValoresAnch_Prv
 
-            @description De manera iterativa e anchura, obtener un diccionario ordenado MapOrden con todos los valores a partir de un nodo del árbol. Cada clave del diccionario devuelta en el diccionario es una clave completa del árbol asociado con cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+            @description De manera iterativa en anchura, obtener un diccionario ordenado MapOrden con todos los valores a partir de los nodos del árbol. Cada clave del diccionario devuelta en el diccionario es una clave completa del árbol asociado con cada valor. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
 
-            @param {MapOrden} nodo - Nodo del árbol.
-            @param {String} clave - Clave (subclaves separadas por puntos) en el árbol del nodo.
+            @param {MapOrden} args - pares de valores Clave-Nodo. El nodo es el punto a partir del cual obtener todos los valores por debajo de él, y la clave es la localización (lista de subclaves) de ese nodo en el árbol.
             
-            @returns {MapOrden} - Un diccionario MapOrden (sin función de comparación asignada) con todos los valores a partir del nodo. Cada clave asociada con cada valor es la clave completa en el árbol. El orden de las claves es el mismo en el que se encuentran los valores a partir del nodo al realizar una búsqueda en anchura BFS eligiendo en cada nivel los nodos en el orden en que están en el árbol.
+            @returns {MapOrden} - Un diccionario MapOrden (sin función de comparación asignada) con todos los valores a partir de los nodos. Cada clave asociada con cada valor es la clave completa en el árbol. El orden de las claves es el mismo en el que se encuentran los valores a partir de cada nodo al realizar una búsqueda en anchura BFS eligiendo en cada nivel los nodos en el orden en que están en el árbol.
 
             @complexity O(n) siendo n el número de nodos del árbol bajo el nodo.
        */
-        static _ObtenerValoresAnch_Prv(nodo, clave) {
+        static _ObtenerValoresAnch_Prv(args*) {
             valores := Util_MapOrden()
-            pilaNodos := Util_MapOrden( , clave, nodo)
-            
-            for _clave, _nodo in pilaNodos {
-                if _nodo is Util_ArbolMapOrden.Hoja
-                    valores[_clave] := _nodo._valor
+            pilaNodos := Util_MapOrden( , args*)
+
+            for clave, nodo in pilaNodos {
+                _clave := clave.ToString(1, ".")
+                if nodo is Util_ArbolMapOrden.Hoja
+                    valores[_clave] := nodo._valor
                 else
-                    for subClave, subNodo in _nodo
-                        pilaNodos[clave "." subClave] := subNodo
+                    for subClave, subNodo in nodo
+                        pilaNodos[_clave "." subClave] := subNodo
             }
 
             return valores
+        }
+
+        /*
+            @method _ObtenerNodo_Prv
+
+            @description Obtener un nodo a partir de subclaves que se aplican a partir de otro nodo. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
+
+            @param {MapOrden} nodo - Nodo a partir del cual se aplican las subclaves.
+            @param {Array} subClaves - Listado con las subclaves a aplicar a partir del nodo.
+
+            @throws {UnsetItemError} - Si no existe las subclaves en el árbol a partir del nodo
+
+            @returns {Util_ArbolMapOrden|Any} - El nodo resultante tras aplicar las subclaves.
+        */
+        static _ObtenerNodo_Prv(nodo, subClaves) {
+            for subClave in subClaves {
+                if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClave)
+                    throw UnsetItemError.CrearErrorAHK("No existe el campo " subClave " de " subClaves.ToString(1, "."))
+
+                nodo := nodo[subClave]
+            }
+
+            return nodo
         }
 
         /*
@@ -1912,18 +1944,10 @@ if (!IsSet(__UTIL_H__)) {
 
                 nodo := this._raiz
 
-                if subClaves.Length == 0
-                    return ordenValores == "profundidad" ? Util_ArbolMapOrden._ObtenerValoresProf_Prv(nodo, clave) : Util_ArbolMapOrden._ObtenerValoresAnch_Prv(nodo, clave)
+                if subClaves.Length > 0
+                    nodo := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, subClaves)
 
-                for subClave in subClaves {
-                    if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClave)
-                        throw UnsetItemError.CrearErrorAHK("No existe el campo " subClave " de " clave " en el árbol")
-
-                    if subClaves.Length == A_Index
-                        return ordenValores == "profundidad" ? Util_ArbolMapOrden._ObtenerValoresProf_Prv(nodo[subClave], clave) : Util_ArbolMapOrden._ObtenerValoresAnch_Prv(nodo[subClave], clave)
-
-                    nodo := nodo[subClave]
-                }
+                return ordenValores == "profundidad" ? Util_ArbolMapOrden._ObtenerValoresProf_Prv(nodo, subClaves) : Util_ArbolMapOrden._ObtenerValoresAnch_Prv(nodo, subClaves)
             }
 
             set {
@@ -1962,11 +1986,11 @@ if (!IsSet(__UTIL_H__)) {
             @description Borrar la clave a partir de un nodo del árbol. Las subclaves que queden vacías al borrar la última subClave también se eliminan. ***ESTA FUNCIÓN NO COMPRUEBA ARGUMENTOS. SOLO USO INTERNO ***
 
             @param {MapOrden} nodo - Nodo del árbol.
-            @param {Array} subClaves - Listado con las subclaves de la clave completa a borrar.
+            @param {Array} subClaves - Listado con las subclaves de la clave completa a borrar. Tiene que tener al menos una subclave.
             @param {Integer} indice - Índice de la subClave dentro de subClaves a partir de la cual se comprueba desde el nodo actual.
             @param {Boolean} borrarNodo - Si true se puede borrar cualquier tipo de nodo; si false solo se pueden borrar hojas y no nodos intermedios.
 
-            @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo resultante de borrar la clave.
+            @returns {MapOrden|Util_ArbolMapOrden.Hoja} - El nodo borrado.
 
             @throws {UnsetItemError} - Si no existe la clave en el árbol; si no se puede borrar un nodo que no es hoja.
 
@@ -2015,27 +2039,73 @@ if (!IsSet(__UTIL_H__)) {
         }
 
         /*
-            @method _Buscar_Prv
+            @method _BuscarNodosProf_Prv
 
-            @description Busca un valor en el árbol dado una clave.
+            @description A partir de un nodo, busca subnodos que tengan una subclave relativa realizando una búsqueda en profundidad.
 
-            @param {Array} subClaves - Las subclaves a buscar.
+            @param {MapOrden} nodo - Nodo a partir del cual buscar.
+            @param {String} claveNodo - Clave completa del nodo.
+            @param {Array} claveRelativa - Listado con las subclaves relativas a buscar por debajo del nodo. Debe tener al menos una subclave.
 
-            @returns {Mixed} - El valor encontrado o null si no existe.
+            @returns {Array} - Lista de pares clave-nodo encontrados según el orden obtenido por la búsqueda en profundidad.
         */
-        static _Buscar_Prv(nodo, subClaves) {
+        static _BuscarNodosProf_Prv(nodo, claveNodo, claveRelativa) {
+            if nodo is Util_ArbolMapOrden.Hoja
+                return []
+                
+            static nodosEncontrados := []
+            static primeraLlamada := true
+
+            if !!primeraLlamada {
+                local _primeraLlamada := true
+                primeraLlamada := false
+            }
+ 
+            try {
+                nodoEncontrado := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, claveRelativa)
+                nodosEncontrados.Push(claveNodo "." claveRelativa.ToString(1, "."), nodoEncontrado)
+            }
+
             for subClave, subNodo in nodo
-                if subClave == subClave
-                    return subNodo
+                if !IsSet(nodoEncontrado) or claveRelativa[1] != subClave
+                    Util_ArbolMapOrden._BuscarProf_Prv(subNodo, claveNodo "." subClave, claveRelativa)
 
+           if IsSet(_primeraLlamada) { ; Se resetea para nuevas llamadas
+                primeraLlamada := true
+                _nodosEncontrados := nodosEncontrados
+                nodosEncontrados := []
 
-            if nodo is Util_ArbolMapOrden.Hoja or !nodo.Has(subClaves[indice])
-                return null
+                return _nodosEncontrados
+            } 
+        }
 
-            if subClaves.Length == indice
-                return nodo[subClaves[indice]]._valor
-            else
-                return Util_ArbolMapOrden._Buscar_Prv(nodo[subClaves[indice]], subClaves, indice + 1)
+        /*
+            @method _BuscarNodosAnch_Prv
+
+            @description A partir de un nodo, busca subnodos que tengan una subclave relativa realizando una búsqueda en anchura.
+
+            @param {MapOrden} nodo - Nodo a partir del cual buscar.
+            @param {String} claveNodo - Clave completa del nodo.
+            @param {Array} claveRelativa - Listado con las subclaves relativas a buscar por debajo del nodo. Debe tener al menos una subclave.
+
+            @returns {Array} - Lista de pares clave-nodo encontrados según el orden obtenido de la búsqueda en anchura.
+        */
+        static _BuscarNodosAnch_Prv(nodo, claveNodo, claveRelativa) {
+            nodosEncontrados := []
+            pilaNodos := Util_MapOrden( , claveNodo, nodo)
+
+            for clave, nodo in pilaNodos {
+                try {
+                    nodoEncontrado := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, claveRelativa)
+                    nodosEncontrados.Push(claveNodo "." claveRelativa.ToString(1, "."), nodoEncontrado)
+                }
+
+                for subClave, subNodo in nodo
+                    if !IsSet(nodoEncontrado) or claveRelativa[1] != subClave
+                        pilaNodos[claveNodo "." subClave] := subNodo
+            }
+
+            return nodosEncontrados
         }
 
         /*
@@ -2044,29 +2114,39 @@ if (!IsSet(__UTIL_H__)) {
             @description Busca un valor en el árbol dado una clave.
 
             @param {String} clave - La subclave para buscar. Pueden ser varias subclaves concatenadas por puntos. 
-            @param {String} tipoBusqueda - Tipo de búsqueda a realizar. Puede ser "profundidad" o "anchura".
+            @param {String} tipoBusqueda - Tipo de búsqueda a realizar. Puede ser "prof" o "anch".
 
             @returns {MapOrden} - Diccionario con los valores cuyas claves contienen la clave de búsqueda.
         */
-        Buscar(subClave, tipoBusqueda := "profundidad", ordenValores := "profundidad") {
+        BuscarValores(subClave, tipoBusqueda := "prof", ordenValores := "prof") {
             subClaves := Util_CadenaALista(Trim(subClave, ". `t"), ".")
 
             if subClaves.Length == 0
                 throw UnsetItemError.CrearErrorAHK("No se puede buscar la raíz del árbol. Tienes que pasara alguna clave")
 
             switch tipoBusqueda {
-                case "profundidad":
-                    return Util_ArbolMapOrden._BuscarProf_Prv(this._raiz, subClaves, ordenValores)
+                case "prof":
+                    nodos := Util_ArbolMapOrden._BuscarNodosProf_Prv(this._raiz, "", subClaves)
                     
-                case "anchura":
-                    return Util_ArbolMapOrden._BuscarAnch_Prv(this._raiz, subClaves, ordenValores)
+                case "anch":
+                    nodos := Util_ArbolMapOrden._BuscarNodosAnch_Prv(this._raiz, "", subClaves)
 
                 default:
                     throw Err_ValorArgError("El tipo de búsqueda no es válido", , , , , , "tipoBusqueda", 2, tipoBusqueda)                    
             }
+
+            switch ordenValores {
+                case "prof":
+                    return Util_ArbolMapOrden._ObtenerValoresProf_Prv(nodos*)                    
+
+                case "anch":
+                    return Util_ArbolMapOrden._ObtenerValoresAnch_Prv(nodos*)
+
+                default:
+                    throw Err_ValorArgError("El tipo de ordenamiento no es válido", , , , , , "ordenValores", 3, ordenValores)                    
+            }
         }
     }
-
 
     /*
         @class MapPrioridad
