@@ -58,11 +58,44 @@ if (!IsSet(__CONFIG_H__)) {
 
         Se podría hacer una opción que consiste en optimizar los archivos de configuración (ejecutada cada cierto tiempo o por el usuario si quiere un control total). Esta opción comprobaría para cada parámetro si su valor es igual al de mayor precedencia de las capas inferiores. Si es así, se elimina, ya que iba a tomar de todas formas el valor aunque no estuviese definido en esa capa. Esto se hace para evitar redundancias en los archivos de configuración.
     */
-    class Config {
 
-        class 
-        static NOMBRE_ARCHIVO_CONFIG := "config.ini"
-        static _clavesPorSeccion := Map("Seccion", Map("clave"))
+
+    class Config {
+        static __New() {
+            this.RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
+            this.NIVEL := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
+            this.NIVEL_INV := this.NIVEL.InvertirClavesValores()
+            this._arbolValores := Util_ArbolMapOrden()
+            this._diccInfo := Util_MapOrden(StrCompare, 
+                "configuracion", {
+                    nombre: "Configuración",
+                    descripcion: "Configuración de la aplicación",
+                    validacion: FuncArg.EsBool
+                }
+            )
+            this._diccDefectoValores := Util_MapOrden(
+                "configuracion", "valor"
+            )
+            this._diccNivelValores := Util_MapOrden(StrCompare, "defecto", this._diccDefectoValores, "sistema", Map(), "usuario", Map(), "sesion", Map())
+        }
+
+        static LeerArchivo(nivel) {
+            ruta := Err_VerificarArg_Prv(nivel, "nivel", 1, FuncArg((n) => Config.RUTA[n], "Convertir", "El nivel de configuración tiene que ser " RUTA.ToString(1)))
+
+            try
+                archivo := FileOpen(ruta, "r", "UTF-8")
+            catch as e
+                return Map()
+
+            ; Ir leyendo cada línea y almacenando el valor. Si la línea no es correcta o el valor de configuración no existe, se registra en el log y se continua. Comprobar también si el valor está en el rango admitido correcto.
+
+
+
+        }
+
+        static inicializar() {
+            Config.cargar()
+        }
     }
 
     /*

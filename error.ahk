@@ -320,7 +320,7 @@ if (!IsSet(__ERR_H__))
     class FuncArg {
         static __New() {
             this.TIPO_FUNC := Map("Comprobar", 1, "Validar", 2, "Convertir", 3)
-            this.TIPO_FUNC_INV := this.TIPO_FUNC.Invertir()
+            this.TIPO_FUNC_INV := this.TIPO_FUNC.InvertirClavesValores()
             this._TIPO_ERROR := Map(this.TIPOS_FUNC["Comprobar"], Err_TipoArgError, this.TIPOS_FUNC["Validar"], Err_ValorArgError, this.TIPOS_FUNC["Convertir"], Err_FuncArgError)
             this._MENSAJES := Map(this.TIPOS_FUNC["Comprobar"], "El valor no cumple la comprobación", this.TIPOS_FUNC["Validar"], "El valor no cumple la validación", this.TIPOS_FUNC["Convertir"], "No se ha podido aplicar al valor la conversión")
 
@@ -328,6 +328,7 @@ if (!IsSet(__ERR_H__))
             this.Cadena := FuncArg(String, "Convertir", "No se puede convertir a una cadena (String)")
             this.Entero := FuncArg(Integer, "Convertir", "No se puede convertir a un entero (Integer)")
             this.EsEntero := FuncArg(IsInteger, "Comprobar", "No es un entero sin decimales")
+            this.EsBool := FuncArg((v) => v == true or v == false, "Validar", "No es un booleano")
             this.FechaValida := FuncArg(IsTime, "Validar", "La fecha no está en un formato válido YYYYMMDDHH24MISS")
             this.EsError := FuncArg((e) => e is Error, "Comprobar", "La excepción tiene que ser tipo Error")
             this.EsClase := FuncArg((o) => o is Class, "Comprobar", "El objeto no es una clase (Class)")
