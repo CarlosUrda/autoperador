@@ -62,15 +62,15 @@ if (!IsSet(__CONFIG_H__)) {
 
     class Config {
         static __New() {
-            this.RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
-            this.NIVEL := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
-            this.NIVEL_INV := this.NIVEL.InvertirClavesValores()
+            this.NIVEL_RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
+            this.NIVEL_PRIORIDAD := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
+            this.NIVEL_PRIORIDAD_INV := this.NIVEL.InvertirClavesValores()
             this._arbolValores := Util_ArbolMapOrden()
             this._diccInfo := Util_MapOrden(StrCompare, 
                 "configuracion", {
                     nombre: "Configuración",
                     descripcion: "Configuración de la aplicación",
-                    validacion: FuncArg.EsBool
+                    validar: FuncArg.EsBool
                 }
             )
             this._diccDefectoValores := Util_MapOrden(
@@ -79,22 +79,56 @@ if (!IsSet(__CONFIG_H__)) {
             this._diccNivelValores := Util_MapOrden(StrCompare, "defecto", this._diccDefectoValores, "sistema", Map(), "usuario", Map(), "sesion", Map())
         }
 
-        static LeerArchivo(nivel) {
-            ruta := Err_VerificarArg_Prv(nivel, "nivel", 1, FuncArg((n) => Config.RUTA[n], "Convertir", "El nivel de configuración tiene que ser " RUTA.ToString(1)))
+        static LeerArchivo(ruta) {
+            FileEncoding "UTF-8"
 
-            try
-                archivo := FileOpen(ruta, "r", "UTF-8")
-            catch as e
-                return Map()
+            valores := Map()
+            resultado := ""
 
-            ; Ir leyendo cada línea y almacenando el valor. Si la línea no es correcta o el valor de configuración no existe, se registra en el log y se continua. Comprobar también si el valor está en el rango admitido correcto.
+            Loop read ruta {
+                emparejados := RegExMatch(A_LoopReadLine, '^\s*"([^"]+)"\s*:\s*(.+)\s*$', &resultado)
+                if emparejados == 0 {
+                    ;Log.Error("Línea de configuración no reconocida: " A_LoopReadLine)
+                    continue
+                }
 
+                clave := resultado[1]
+                valor := RTrim(resultado[2], ",") 
 
+                if !this._diccInfo.Has(clave) {
+                    ;Log.Error("Clave de configuración no reconocida: " clave)
+                    continue
+                }
 
+                if !this._diccInfo[clave].validar(valor) {
+                    ;Log.Error("Valor de configuración no válido para la clave " clave ": " this._diccInfo[clave].validar.Mensaje)
+                    continue
+                }
+                
+                valores[clave] := valor                
+            }
+
+            return valores
         }
 
+
         static inicializar() {
-            Config.cargar()
+            for nivel, ruta in this.NIVEL_RUTA {
+                this._diccNivelValores[nivel] := this.LeerArchivo(ruta)
+            }
+
+            for clave in this._diccInfo {
+                valores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
+
+                for nivel, valoresNivel in this._diccNivelValores {
+                    if !valoresNivel.Has(clave)
+                        continue
+                    
+                    valores[this.NIVEL_PRIORIDAD[nivel]] := valoresNivel[clave]
+                }
+
+                this._arbolValores[clave] := valores
+            }
         }
     }
 

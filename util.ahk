@@ -1953,7 +1953,7 @@ if (!IsSet(__UTIL_H__)) {
         */
         __Item[clave, ordenValores := "prof"] {
             get {
-                subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+                subClaves := Util_CadenaALista(Trim(clave, "." A_Space . A_Tab), ".")
 
                 nodo := this._raiz
 
@@ -1961,11 +1961,11 @@ if (!IsSet(__UTIL_H__)) {
                     nodo := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, subClaves)
                 }
 
-                return ordenValores == "prof" ? Util_ArbolMapOrden._ObtenerValoresProf_Prv(subClave, nodo) : Util_ArbolMapOrden._ObtenerValoresAnch_Prv(subClaves, nodo)
+                return ordenValores == "prof" ? Util_ArbolMapOrden._ObtenerValoresProf_Prv(subClaves, nodo) : Util_ArbolMapOrden._ObtenerValoresAnch_Prv(subClaves, nodo)
             }
 
             set {
-                subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+                subClaves := Util_CadenaALista(Trim(clave, "." A_Space . A_Tab), ".")
 
                 if subClaves.Length == 0
                     throw UnsetItemError.CrearErrorAHK("Tienes que pasara alguna clave")
@@ -2044,10 +2044,10 @@ if (!IsSet(__UTIL_H__)) {
             @complexity O(n) siendo n el número de subclaves de clave.
         */
         Delete(clave, borrarNodo := false) {
-            subClaves := Util_CadenaALista(Trim(clave, ". `t"), ".")
+            subClaves := Util_CadenaALista(Trim(clave, "." A_Space . A_Tab), ".")
 
             if subClaves.Length == 0
-                throw UnsetItemError.CrearErrorAHK("No se puede borrar la raíz del árbol. Tienes que pasara alguna clave")
+                throw UnsetItemError.CrearErrorAHK("No se puede borrar la raíz del árbol. Tienes que pasar alguna clave")
 
             return Util_ArbolMapOrden._Delete_Prv(this._raiz, subClaves, 1, borrarNodo)
         }
@@ -2136,7 +2136,7 @@ if (!IsSet(__UTIL_H__)) {
             @returns {MapOrden} - Diccionario con los valores cuyas claves contienen la clave de búsqueda.
         */
         BuscarValores(claveRelativa, tipoBusqueda := "prof", ordenValores := "prof") {
-            subClaves := Util_CadenaALista(Trim(claveRelativa, ". `t"), ".")
+            subClaves := Util_CadenaALista(Trim(claveRelativa, "." A_Space . A_Tab), ".")
 
             if subClaves.Length == 0
                throw UnsetItemError.CrearErrorAHK("Tienes que pasar alguna clave a buscar")
