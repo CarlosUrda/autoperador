@@ -64,12 +64,13 @@ if (!IsSet(__CONFIG_H__)) {
         static __New() {
             this.NIVEL_RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
             this.NIVEL_PRIORIDAD := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
-            this.NIVEL_PRIORIDAD_INV := this.NIVEL.InvertirClavesValores()
+            this.NIVEL_PRIORIDAD_INV := this.NIVEL_PRIORIDAD.InvertirClavesValores()
             this._arbolValores := Util_ArbolMapOrden()
             this._diccInfo := Util_MapOrden(StrCompare, 
                 "configuracion", {
                     nombre: "Configuración",
                     descripcion: "Configuración de la aplicación",
+                    tipo: "bool",
                     validar: FuncArg.EsBool
                 }
             )
@@ -87,7 +88,7 @@ if (!IsSet(__CONFIG_H__)) {
 
             Loop read ruta {
                 emparejados := RegExMatch(A_LoopReadLine, '^\s*"([^"]+)"\s*:\s*(.+)\s*$', &resultado)
-                if emparejados == 0 {
+                if emparejados != 2 {
                     ;Log.Error("Línea de configuración no reconocida: " A_LoopReadLine)
                     continue
                 }
@@ -105,6 +106,7 @@ if (!IsSet(__CONFIG_H__)) {
                     continue
                 }
                 
+                ; Aqui hay que evaluar el valor para convertirlo al tipo que corresponda
                 valores[clave] := valor                
             }
 
@@ -113,21 +115,27 @@ if (!IsSet(__CONFIG_H__)) {
 
 
         static inicializar() {
-            for nivel, ruta in this.NIVEL_RUTA {
-                this._diccNivelValores[nivel] := this.LeerArchivo(ruta)
-            }
+            for nivel, ruta in this.NIVEL_RUTA
+                if FileExist(ruta) != "" {
+                    try
+                        this._diccNivelValores[nivel] := this.LeerArchivo(ruta)
+                    catch as e
+                        ;Log.Error("Error al leer el archivo de configuración de " nivel ": " e.Message)
+                }
+                else
+                    ; Log.Error("No se ha encontrado el archivo de configuración de " nivel ": " ruta)
 
             for clave in this._diccInfo {
                 valores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
 
-                for nivel, valoresNivel in this._diccNivelValores {
-                    if !valoresNivel.Has(clave)
-                        continue
-                    
-                    valores[this.NIVEL_PRIORIDAD[nivel]] := valoresNivel[clave]
-                }
+                for nivel, valoresNivel in this._diccNivelValores
+                    if valoresNivel.Has(clave)                 
+                        valores[this.NIVEL_PRIORIDAD[nivel]] := valoresNivel[clave]
 
-                this._arbolValores[clave] := valores
+                try
+                    this._arbolValores[clave] := valores
+                catch as e
+                    ;Log.Error("Error al cargar en el árbol los valores de configuración de la clave " clave ": " e.Message)
             }
         }
     }
