@@ -859,8 +859,8 @@ if (!IsSet(__UTIL_H__)) {
 
     ; Se añade Util_ContieneValor como método a Map y Array
     Enumerator.Prototype.DefineProp("ContieneValor", {Call: _Util_ContieneValor})
-    Map.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(2, 2, v)})
-    Array.Prototype.DefineProp("ContieneValor", {Call: (v) => _Util_ContieneValor(1, 1, v)})
+    Map.Prototype.DefineProp("ContieneValor", {Call: (e, v) => _Util_ContieneValor(e, 2, 2, v)})
+    Array.Prototype.DefineProp("ContieneValor", {Call: (e, v) => _Util_ContieneValor(e, 1, 1, v)})
     global Util_ContieneValor := _Util_ContieneValor
 
 
@@ -1024,7 +1024,7 @@ if (!IsSet(__UTIL_H__)) {
         return lista.LimpiarEnteros(minValor?, maxValor?, nuevo)
     }
 
-    Array.Prototype.DefineProp("LimpiarEnteros", {Call: (v) => _Util_LimpiarListaEnterosM})
+    Array.Prototype.DefineProp("LimpiarEnteros", {Call: Util_LimpiarListaEnterosM})
     global Util_LimpiarListaEnteros := _Util_LimpiarListaEnteros
 
 
@@ -1848,37 +1848,24 @@ if (!IsSet(__UTIL_H__)) {
             @complexity O(n) siendo n el número de nodos del árbol bajo el nodo.
        */
         static _ObtenerValoresProf_Prv(args*) {
-            static valores := Util_MapOrden()
-            static primeraLlamada := true
+            valores := Util_MapOrden()
 
-            if !!primeraLlamada {
-                local _primeraLlamada := true
-                primeraLlamada := false
+            ObtenerValoresProf(clave, nodo) {
+                if nodo is Util_ArbolMapOrden.Hoja
+                    valores[clave] := nodo._valor
+                else 
+                    for subClave, subNodo in nodo
+                        ObtenerValoresProf(clave "." subClave, subNodo)                        
             }
-            
+
             Loop args.Length // 2 {
                 clave := args[A_Index].ToString(1, ".")
                 nodo := args[A_Index + 1]
- 
-                if nodo is Util_ArbolMapOrden.Hoja
-                    valores[clave] := nodo._valor
-                else {
-                    _args := []
-                    for subClave, subNodo in nodo
-                        _args.Push(clave "." subClave, subNodo)
-                    
-                    ; Se puede meter esta llamada en el for y evitar crear el array.
-                    Util_ArbolMapOrden._ObtenerValoresProf_Prv(_args*)
-                }
+
+                ObtenerValoresProf(clave, nodo)
             }
 
-            if IsSet(_primeraLlamada) { ; Se resetea para nuevas llamadas
-                primeraLlamada := true
-                _valores := valores
-                valores := Util_MapOrden()
-
-                return _valores
-            }
+            return valores
         }
 
 
@@ -2066,29 +2053,24 @@ if (!IsSet(__UTIL_H__)) {
             @complexity O(n) siendo n el número de nodos del árbol
         */
         static _BuscarNodosProf_Prv(nodo, claveNodo, claveRelativa) {
-            static nodosEncontrados := []
-            static llamada := 1
+            nodosEncontrados := []
 
-            if !(nodo is Util_ArbolMapOrden.Hoja) {
-                try
-                    nodoEncontrado := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, claveRelativa)
+            BuscarNodosProf(nodo, claveNodo, claveRelativa) {
+                if !(nodo is Util_ArbolMapOrden.Hoja) {
+                    try
+                        nodoEncontrado := Util_ArbolMapOrden._ObtenerNodo_Prv(nodo, claveRelativa)
 
-                for subClave, subNodo in nodo
-                    if IsSet(nodoEncontrado) and claveRelativa[1] == subClave
-                        nodosEncontrados.Push(claveNodo "." claveRelativa.ToString(1, "."), nodoEncontrado)
-                    else {
-                        llamada++
-                        Util_ArbolMapOrden._BuscarProf_Prv(subNodo, claveNodo "." subClave, claveRelativa)
-                        llamada--
-                    }
+                    for subClave, subNodo in nodo
+                        if IsSet(nodoEncontrado) and claveRelativa[1] == subClave
+                            nodosEncontrados.Push(claveNodo "." claveRelativa.ToString(1, "."), nodoEncontrado)
+                        else
+                            BuscarNodosProf(subNodo, claveNodo "." subClave, claveRelativa)
+                }
             }
 
-           if llamada == 1 { ; Se resetea para nuevas llamadas
-                _nodosEncontrados := nodosEncontrados
-                nodosEncontrados := []
+            BuscarNodosProf(nodo, claveNodo, claveRelativa)
 
-                return _nodosEncontrados
-            } 
+            return nodosEncontrados
         }
 
         /*
