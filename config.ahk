@@ -65,22 +65,25 @@ if (!IsSet(__CONFIG_H__)) {
             this.NIVEL_RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
             this.NIVEL_PRIORIDAD := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
             this.NIVEL_PRIORIDAD_INV := this.NIVEL_PRIORIDAD.InvertirClavesValores()
-            this._arbolValores := Util_ArbolMapOrden()
             this._diccInfo := Util_MapOrden(StrCompare, 
                 "configuracion", {
                     nombre: "Configuración",
                     descripcion: "Configuración de la aplicación",
                     tipo: "bool",
-                    validar: FuncArg.EsBool
+                    defecto: true,
+                    validar: FuncArg.EsBool,
+                    convertir: true
                 }
             )
-            this._diccDefectoValores := Util_MapOrden(
-                "configuracion", "valor"
-            )
-            this._diccNivelValores := Util_MapOrden(StrCompare, "defecto", this._diccDefectoValores, "sistema", Map(), "usuario", Map(), "sesion", Map())
+            this._diccValores := Util_MapOrden()
+            this._arbolValores := Util_ArbolMapOrden()
         }
 
-        static LeerArchivo(ruta) {
+        static CargarArchivo(nivel) {
+            if !this.NIVEL_RUTA.Has(nivel) {
+                throw Err_ValorArgError("Nivel de configuración no existente", , , , , , "nivel", 1, nivel)
+                return
+            }
             FileEncoding "UTF-8"
 
             valores := Map()

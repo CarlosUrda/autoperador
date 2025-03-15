@@ -1268,9 +1268,10 @@ if (!IsSet(__UTIL_H__)) {
         @returns {Array} - Lista con los elementos de la cadena.
     */
     Util_CadenaALista(cadena, separador := ".", caracteres?) {
-        cadena := Err_VerificarArg_Prv(cadena, "cadena", 1, FuncArg((s) => Trim(String(s)), "Comprobar", "El argumento debe ser una cadena"))
-        separador := Err_VerificarArg_Prv(separador, "separador", 2, FuncArg((s) => Trim(String(s)), "Comprobar", "El separador debe ser una cadena"))
-        caracteres := Err_VerificarArg_Prv(caracteres, "caracteres", 3, FuncArg((s) => Trim(String(s)), "Comprobar", "Los caracteres a limpiar al final e inicio de cada elemento deben ser una cadena"))
+        Err_VerificarArg_Prv(cadena, "cadena", 1, FuncArg.EsCadena)
+        Err_VerificarArg_Prv(separador, "separador", 2, FuncArg.EsCadena)
+        if IsSet(caracteres)
+            Err_VerificarArg_Prv(caracteres, "caracteres", 3, FuncArg.EsCadena)
 
         try
             lista := StrSplit(cadena, separador)
@@ -1802,7 +1803,7 @@ if (!IsSet(__UTIL_H__)) {
         /*
             @constructor
 
-            @param {Enumerable} enumerable - Enumerable que admite dos argumentos clave-valor, a partir del cual se crea el árbol. Cada clave es una clave completa del árbol formada por subclaves separadas por puntos.
+            @param {Enumerable} enumerable - Enumerable que admite dos argumentos clave-valor, a partir del cual se crea el árbol. Cada clave es una cadena (String) completa del árbol formada por subclaves separadas por puntos.
 
             @throws {Err_TipoArgError|MethodError} - Si el argumento enum no es un enumerable válido.
 
@@ -1930,7 +1931,7 @@ if (!IsSet(__UTIL_H__)) {
             @description Propiedad para acceder a los valores del árbol a partir de una clave. Si la clave no existe, se lanza UnsetItemError.  
 
             @param {String} clave - Clave en el árbol. Las subclaves se separan por puntos. Si se pasa una cadena vacía se obtienen todos los valores del árbol.
-            @param {String} ordenValores - Puede ser "prof" para un acceso recursivo o "anch" para un acceso iterativo.
+            @param {String} ordenValores - En Get, puede ser "prof" para un acceso recursivo o "anch" para un acceso iterativo.
 
             @returns {Any\MapOrden} - En set devuelve el valor que se acaba de guardar en la clave; en get devuelve un diccionario ordenado por claves con todos los valores bajo esa clave. Si ordenValores es "prof", los valores están ordenados por claves; si es "anch", los valores no están ordenados por clave, sino por niveles en el árbol. EL MapOrden devuelto no tiene asignado una función de comparación.
 

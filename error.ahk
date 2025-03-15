@@ -85,14 +85,7 @@ if (!IsSet(__ERR_H__))
 
         @returns true o false si es o no cadena.
     */
-    _Err_EsCadena(cadena) {
-        try 
-            String(cadena)
-        catch
-            return false
-
-        return true
-    }
+    _Err_EsCadena(cadena) => cadena is String
 
     global Err_EsCadena := _Err_EsCadena
 
@@ -326,6 +319,8 @@ if (!IsSet(__ERR_H__))
 
             ; Objetos FuncArg genéricos
             this.Cadena := FuncArg(String, "Convertir", "No se puede convertir a una cadena (String)")
+            this.EsCadena := FuncArg(Err_EsCadena, "Comprobar", "No es una cadena (String)")
+            this.EsCadenaSinBlancos := FuncArg(IsAlnum, "Comprobar", "No es una cadena o contiene espacios en blanco")
             this.Entero := FuncArg(Integer, "Convertir", "No se puede convertir a un entero (Integer)")
             this.EsEntero := FuncArg(IsInteger, "Comprobar", "No es un entero sin decimales")
             this.EsBool := FuncArg((v) => v == true or v == false, "Validar", "No es un booleano")
