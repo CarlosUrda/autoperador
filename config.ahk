@@ -75,11 +75,55 @@ if (!IsSet(__CONFIG_H__)) {
                     convertir: true
                 }
             )
-            this._diccValores := Util_MapOrden()
-            this._arbolValores := Util_ArbolMapOrden()
+
+            ; Se inicializa diccionario de valores por defecto a ser usado por la configuración de cada sesión.
+            this._diccDefecto := Util_MapOrden()
+            for clave, info in this._diccInfo
+                this._diccDefecto[clave] := info.defecto
+            this._diccDefecto.Comparar := StrCompare
         }
 
-        static CargarArchivo(nivel) {
+        /*
+            @constructor
+
+            @description Constructor de la clase Config.
+            Se crea un solo árbol porque tener uno por cada nivel es muy costoso a la hora de acceder a varios árboles para un solo valor. Se crean cuatro diccionarios, uno por cada nivel, porque restaurar los datos de configuración de un nivel es más sencillo, y la diferencia del coste de acceso entre acceder a un diccionario o a cuatro es similar.
+
+            @param {string} idSesion - Identificador de la sesión.
+        */
+        __New(idSesion) {
+            this._idSesion := idSesion
+
+            this._diccNivelValores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
+            for nivel, prioridad in Config.NIVEL_PRIORIDAD
+                if nivel != "defecto"
+                    this._diccNivelValores[prioridad] := Util_MapOrden()
+            this._diccNivelValores[Config.NIVEL_PRIORIDAD["defecto"]] := Config._diccDefecto
+            this._arbolValores := Util_ArbolMapOrden()
+
+            this.inicializarValores()
+
+            ; Se ordenan los diccionarios por clave en cada nivel de prioridad.
+            for prioridad in Config.NIVEL_PRIORIDAD_INV
+                this._diccNivelValores[prioridad].Comparar := StrCompare
+
+        }
+
+        __Item[clave] {
+            get {
+            }
+            
+            set {
+
+            }
+
+        }
+
+        __Enum(numArgs) {
+            
+        }
+
+        CargarArchivo(nivel) {
             if !this.NIVEL_RUTA.Has(nivel)
                 throw Err_ValorArgError("Nivel de configuración no existente", , , , , , "nivel", 1, nivel)
                 
@@ -116,7 +160,7 @@ if (!IsSet(__CONFIG_H__)) {
         }
 
 
-        static inicializar() {
+        inicializar() {
             for nivel, ruta in this.NIVEL_RUTA
                 if FileExist(ruta) != "" {
                     try
