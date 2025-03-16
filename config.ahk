@@ -80,10 +80,9 @@ if (!IsSet(__CONFIG_H__)) {
         }
 
         static CargarArchivo(nivel) {
-            if !this.NIVEL_RUTA.Has(nivel) {
+            if !this.NIVEL_RUTA.Has(nivel)
                 throw Err_ValorArgError("Nivel de configuración no existente", , , , , , "nivel", 1, nivel)
-                return
-            }
+                
             FileEncoding "UTF-8"
 
             valores := Map()
