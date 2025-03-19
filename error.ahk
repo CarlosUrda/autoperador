@@ -91,6 +91,42 @@ if (!IsSet(__ERR_H__))
 
 
     /*
+        @function Err_Bool
+
+        @description Convertir un valor a booleano.
+
+        @param {Object} valor - Valor a convertir.
+
+        @returns true o false.
+    */
+    Err_Bool(valor) => valor ? true : false
+
+    /*
+        @function Err_CadenaABool
+
+        @description Convertir una cadena a booleano.
+
+        @param {String} cadena - Cadena a convertir. Los valores válidos son "true" o "false".
+
+        @returns true o false.
+
+        @throws {Err_TipoArgError} - Si el valor no es una cadena.
+        @throws {Err_ValorArgError} - Si el valor de la cadena no es "true" o "false".
+    */
+    Err_CadenaABool(cadena) {
+        if !Err_EsCadena(cadena)
+            throw Err_TipoArgError("El valor no es una cadena", , , , , , "cadena", 1, cadena, Type(cadena))
+
+        cadena := StrLower(cadena)
+        if cadena == "true"
+            return true
+        else if cadena == "false"
+            return false
+        else
+            throw Err_ValorArgError("El valor de la cadena no es true o false", , , , , , "cadena", 1, cadena)
+    }
+
+    /*
         @function Err_AdmiteNumArgs
 
         @description Comprobar si una función admite un número de argumentos.
@@ -236,17 +272,17 @@ if (!IsSet(__ERR_H__))
 
         @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
-    _Err_VerificarArg_Prv(valorArg?, nombreArg?, posArg?, funciones*) {
+    _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*) {
         for funcion in funciones {
             if funcion.CodigoTipoFunc == FuncArg.TIPO_FUNC["Convertir"] {
                 try
-                    valorArg := funcion(valorArg?)
+                    valorArg := funcion(valorArg)
                 catch as e
                     esCorrecto := false
             }
             else {
                 try
-                    esCorrecto := funcion(valorArg?) 
+                    esCorrecto := funcion(valorArg) 
                 catch as e
                     esCorrecto := false
             }
@@ -255,10 +291,11 @@ if (!IsSet(__ERR_H__))
                 argsExtra := []
                 switch funcion.TipoError {
                     case Err_TipoArgError:
-                        argsExtra.Push(IsSet(valorArg) ? Type(valorArg) : valorArg?)
+                        argsExtra.Push(Type(valorArg))
+                        ;argsExtra.Push(IsSet(valorArg) ? Type(valorArg) : valorArg?)
                 }
 
-                throw !Err_ErroresPersonalizadosActivo ? Error(funcion.Mensaje) : funcion.TipoError(funcion.Mensaje, , , , , e?, nombreArg?, posArg?, valorArg?, argsExtra*)
+                throw !Err_ErroresPersonalizadosActivo ? Error(funcion.Mensaje) : funcion.TipoError(funcion.Mensaje, ERR_FUNCION_ORIGEN["LLAMANTE"], , , , e?, nombreArg?, posArg?, valorArg, argsExtra*)
             }
         }
 
@@ -282,7 +319,7 @@ if (!IsSet(__ERR_H__))
 
         @throws {Error/Err_ArgError} - Se lanzará el tipo de Err_ArgError asociado con la función FuncArg que provoque la excepción.
     */
-    _Err_VerificarArg(valorArg?, nombreArg?, posArg?, funciones*) {
+    _Err_VerificarArg(valorArg, nombreArg?, posArg?, funciones*) {
         ; nombreArg y posArg solo sirven de información a ser incluida en el error lanzado en caso de fallo en la verificación. Ambos ya se comprueban en el único sitio donde se usan: constructor del Error a lanzar si falla la verificación.
 
         for funcion in funciones {
@@ -291,7 +328,7 @@ if (!IsSet(__ERR_H__))
             /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
 
-        return _Err_VerificarArg_Prv(valorArg?, nombreArg?, posArg?, funciones*)
+        return _Err_VerificarArg_Prv(valorArg, nombreArg?, posArg?, funciones*)
     }
 
     global Err_VerificarArg := _Err_VerificarArg
@@ -335,6 +372,9 @@ if (!IsSet(__ERR_H__))
             this.EsFuncArg := FuncArg((f) => f is FuncArg, "Comprobar", "No es una función válida de tipo FuncArg")
             this.EsLlamable := FuncArg(Err_EsLlamable, "Comprobar", "Tiene que ser una función o un objeto llamable")
             this.Admite2Args := FuncArg((f) => Err_AdmiteNumArgs(f, 2), "Comprobar", "No es una función o no admite 2 argumentos")
+            this.ExisteArchivo := FuncArg((ruta) => FileExist(ruta) != "", "Comprobar", "El archivo no existe")
+            this.Bool := FuncArg(Err_Bool, "Convertir", "El valor no se puede convertir a bool")
+            this.CadenaABool := FuncArg(Err_CadenaABool, "Convertir", "No se puede convertir la cadena a bool")
         }
 
         __New(funcion, codigoTipoFunc, mensaje?, tipoError?) {
@@ -558,7 +598,18 @@ if (!IsSet(__ERR_H__))
             Err_ErroresPersonalizadosActivo := false
 
             ; USO PRIVADO INTERNO EXCLUSIVAMENTE
-            this._ERRORES_AHK := Map(MemoryError, {nombre: "MemoryError", codigo: super.ERRORES["MEMORIA"]}, OSError, {nombre: "OSError", codigo: super.ERRORES["OS"]}, TargetError, {nombre: "TargetError", codigo: super.ERRORES["VENTANA"]}, TimeOutError, {nombre: "TimeOutError", codigo: super.ERRORES["TIEMPO_RESPUESTA"]}, TypeError, {nombre: "TypeError", codigo: super.ERRORES["TIPO"]}, UnsetError, {nombre: "UnsetError", codigo: super.ERRORES["INDEF"]}, MemberError, {nombre: "MemberError", codigo: super.ERRORES["MIEMBRO_INDEF"]}, PropertyError, {nombre: "PropertyError", codigo: super.ERRORES["PROP_INDEF"]}, MethodError, {nombre: "MethodError", codigo: super.ERRORES["METODO_INDEF"]}, UnsetItemError, {nombre: "UnsetItemError", codigo: super.ERRORES["CLAVE_INDEF"]}, ValueError, {nombre: "ValueError", codigo: super.ERRORES["VALOR"]}, IndexError, {nombre: "IndexError", codigo: super.ERRORES["INDICE"]}, ZeroDivisionError, {nombre: "ZeroDivisionError", codigo: super.ERRORES["DIV0"]})
+            this._ERRORES_AHK := 
+                Map(MemoryError, {nombre: "MemoryError", codigo: super.ERRORES["MEMORIA"]}, 
+                    OSError, {nombre: "OSError", codigo: super.ERRORES["OS"]}, 
+                    TargetError, {nombre: "TargetError", codigo: super.ERRORES["VENTANA"]}, 
+                    TimeOutError, {nombre: "TimeOutError", codigo: super.ERRORES["TIEMPO_RESPUESTA"]}, 
+                    TypeError, {nombre: "TypeError", codigo: super.ERRORES["TIPO"]}, UnsetError, {nombre: "UnsetError", codigo: super.ERRORES["INDEF"]}, 
+                    MemberError, {nombre: "MemberError", codigo: super.ERRORES["MIEMBRO_INDEF"]}, 
+                    PropertyError, {nombre: "PropertyError", codigo: super.ERRORES["PROP_INDEF"]}, 
+                    MethodError, {nombre: "MethodError", codigo: super.ERRORES["METODO_INDEF"]}, UnsetItemError, {nombre: "UnsetItemError", codigo: super.ERRORES["CLAVE_INDEF"]}, 
+                    ValueError, {nombre: "ValueError", codigo: super.ERRORES["VALOR"]}, 
+                    IndexError, {nombre: "IndexError", codigo: super.ERRORES["INDICE"]}, 
+                    ZeroDivisionError, {nombre: "ZeroDivisionError", codigo: super.ERRORES["DIV0"]})
 
             for tipoErrorAHK in this._ERRORES_AHK
                 if tipoErrorAHK.Base == Error

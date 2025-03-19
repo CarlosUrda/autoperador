@@ -1,6 +1,8 @@
 #Requires AutoHotkey v2.0
 
 #Include "debug.ahk"
+#Include sesion.ahk
+#Include error.ahk
 
 if (!IsSet(__CONFIG_H__)) {
     global __CONFIG_H__ := true
@@ -57,30 +59,32 @@ if (!IsSet(__CONFIG_H__)) {
         Es decir, lo que se haga durante la sesión en la capa de sesión se actualiza en memoria en tiempo real, pero cualquier cambio hacia los archivos de configuración, o restauración de valores desde los archivos de configuración, se necesita la confirmación del usuario. 
 
         Se podría hacer una opción que consiste en optimizar los archivos de configuración (ejecutada cada cierto tiempo o por el usuario si quiere un control total). Esta opción comprobaría para cada parámetro si su valor es igual al de mayor precedencia de las capas inferiores. Si es así, se elimina, ya que iba a tomar de todas formas el valor aunque no estuviese definido en esa capa. Esto se hace para evitar redundancias en los archivos de configuración.
+
+        @todo Hacer mediante una máquina de estados y expresiones regulares un parser de Arrays y Objetos. Mediante la máquina de estados se comprueba toda la sintaxis y para los valores se comprueba que es un tipo de dato fundamental (Bool, Número, Cadena). Si es también un objeto un array, se pasa el parser de manera recursiva.
     */
 
 
     class Config {
         static __New() {
-            this.NIVEL_RUTA := Map("usuario", "config_usuario.ini", "sistema", "config_sistema.ini")
+            this.NIVEL_RUTA := Map("usuario", "ruta/{}/config_usuario.ini", "sistema", "ruta/config_sistema.ini")
             this.NIVEL_PRIORIDAD := Map("defecto", 0, "sistema", 1, "usuario", 2, "sesion", 3)
             this.NIVEL_PRIORIDAD_INV := this.NIVEL_PRIORIDAD.InvertirClavesValores()
             this._diccInfo := Util_MapOrden(StrCompare, 
-                "configuracion", {
-                    nombre: "Configuración",
-                    descripcion: "Configuración de la aplicación",
-                    tipo: "bool",
+                "clave1", { ; Todas las Claves siempre en minúsculas
+                    nombre: "Clave de ejemplo 1",
+                    descripcion: "Expliación de la clave de ejemplo 1",
+                    tipo: "Bool",
                     defecto: true,
-                    validar: FuncArg.EsBool,
-                    convertir: true
+                    validar: [FuncArg.CadenaABool] ; Lista de FuncArgs a aplicarse en orden para validar el valor
+                }
+                "clave2", { 
+                    nombre: "Clave de ejemplo 2",
+                    descripcion: "Expliación de la clave de ejemplo 2",
+                    tipo: "Integer",
+                    defecto: 0,
+                    validar: [FuncArg.EsEntero, FuncArg.Entero] 
                 }
             )
-
-            ; Se inicializa diccionario de valores por defecto a ser usado por la configuración de cada sesión.
-            this._diccDefecto := Util_MapOrden()
-            for clave, info in this._diccInfo
-                this._diccDefecto[clave] := info.defecto
-            this._diccDefecto.Comparar := StrCompare
         }
 
         /*
@@ -91,26 +95,19 @@ if (!IsSet(__CONFIG_H__)) {
 
             @param {string} idSesion - Identificador de la sesión.
         */
-        __New(idSesion) {
-            this._idSesion := idSesion
-
-            this._diccNivelValores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
-            for nivel, prioridad in Config.NIVEL_PRIORIDAD
-                if nivel != "defecto"
-                    this._diccNivelValores[prioridad] := Util_MapOrden()
-            this._diccNivelValores[Config.NIVEL_PRIORIDAD["defecto"]] := Config._diccDefecto
-            this._arbolValores := Util_ArbolMapOrden()
-
+        __New(sesion) {
+            this._sesion := sesion
             this.inicializarValores()
-
-            ; Se ordenan los diccionarios por clave en cada nivel de prioridad.
-            for prioridad in Config.NIVEL_PRIORIDAD_INV
-                this._diccNivelValores[prioridad].Comparar := StrCompare
-
         }
 
-        __Item[clave] {
+        __Item[clave, nivel] {
             get {
+                if this._diccValores.Has(clave)
+                    return this._diccValores[clave].Valor[-1]
+                
+                valores := this._arbolValores[clave]
+
+                return this._diccValores[clave]
             }
             
             set {
@@ -123,66 +120,156 @@ if (!IsSet(__CONFIG_H__)) {
             
         }
 
-        CargarArchivo(nivel) {
-            if !this.NIVEL_RUTA.Has(nivel)
-                throw Err_ValorArgError("Nivel de configuración no existente", , , , , , "nivel", 1, nivel)
-                
-            FileEncoding "UTF-8"
+        Buscar(clave) {
+        
+        }
 
-            valores := Map()
+        /*
+            @static _ObtenerDiccDesdeArchivo
+
+            @description Obtiene un diccionario de pares clave-valor a partir de un archivo de configuración.
+
+            @param {string} ruta - Ruta del archivo de configuración.
+
+            @returns {Map} Diccionario de pares clave-valor.
+            
+            @todo Para mostrar la parte de cada línea que es errónea, en lugar de decir que en la línea ha habido un error sin indicar dónde exactamente, se puede hacer algo así:
+            RegExMatch(Trim(A_LoopField), "Ui)(.*)\[([a-z_]\w*)\](.*)\")
+            De manera que si el grupo 1 y 3 tienen texto, hay error, pudiendo reconstruir la línea con el error resaltado
+
+            Si se usa secciones := IniRead(ruta), obtiene una lista de secciones que luegi habría que usar en bucle para obtener las claves de cada sección con clavesValor := IniRead(ruta, seccion). Sería mucho más sencillo, pero si meten el nombre de una sección mal, simplemente se ignora con todas sus claves, sin poder informar en el log de errores de configuración.
+        */
+        static _ObtenerDiccDesdeArchivo(ruta) {        
+            _Err_VerificarArg_Prv(ruta, "ruta", 1, FuncArg.ExisteArchivo)
+
+            seccion := clave := valor := ""
+            estado := "seccion"
             resultado := ""
+            valores := Map()
 
-            Loop read ruta {
-                emparejados := RegExMatch(A_LoopReadLine, '^\s*"([^"]+)"\s*:\s*(.+)\s*$', &resultado)
-                if emparejados != 2 {
-                    ;Log.Error("Línea de configuración no reconocida: " A_LoopReadLine)
+            ; Tabla de transición de la máquina de estados. [estado actual][evento] => nuevo estado
+            ; Estados: "seccion": Estado inicial s0 que admite solo una [sección]
+            ;          "clave-valor|seccion": Estado s1 que admite una clave=valor o una [sección]
+            tablaTransicion := Map(
+                "seccion", Map("recibe_seccion", "clave-valor|seccion"), 
+                "clave-valor|seccion", Map(
+                    "recibe_clave-valor", "clave-valor|seccion", 
+                    "recibe_seccion", "clave_valor|seccion"
+                )
+            )
+
+            ObtenerSeccion() {
+                if RegExMatch(linea, 'iU)^\s*\[\s*([_a-z]\w*(\.[_a-z]\w*))*\s*\]\s*$', &resultado) == 0
+                    return false
+
+                seccion := StrLower(resultado[1])
+                return true
+            }
+
+            ObtenerClaveValor() {
+                if RegExMatch(linea, "^\s*(?i)([a-z_]\w*)(?-i)\s*=\s*([^\s].*?)\s*$", &resultado) == 0
+                    return false
+
+                clave := StrLower(resultado[1])
+                valor := resultado[2]
+                return true
+            }
+
+            Loop read, ruta {
+                linea := Trim(A_LoopReadLine)
+                if linea = ""
+                    continue
+
+                if ObtenerSeccion() {
+                    estado := tablaTransicion[estado]["recibe_seccion"]
                     continue
                 }
 
-                clave := resultado[1]
-                valor := RTrim(resultado[2], ",") 
+                switch estado {
+                    case "seccion":
+                        ;Log.Error("(L " A_Index "): Se espera [sección] en el archivo de configuración " ruta ": " linea)
+                        continue
+                    
+                    case "clave-valor|seccion":
+                        if !ObtenerClaveValor() {
+                            ;Log.Error("Se espera clave = valor o nueva [seccion] en el archivo de configuración " ruta " A_LoopField)
+                            continue
+                        }
 
-                if !this._diccInfo.Has(clave) {
-                    ;Log.Error("Clave de configuración no reconocida: " clave)
-                    continue
-                }
+                        clave := seccion "." clave
+                        if !this._diccValores.Has(clave) {
+                            ;Log.Error("Clave de configuración no reconocida: " clave)
+                            continue
+                        }
 
-                if !this._diccInfo[clave].validar(valor) {
-                    ;Log.Error("Valor de configuración no válido para la clave " clave ": " this._diccInfo[clave].validar.Mensaje)
-                    continue
+                        try
+                            valores[clave] := _Err_VerificarArg_Prv(valor, clave, , Config._diccInfo[clave].validar*) 
+                        catch as e {
+                            ;Log.Error("L( "A_Index ") Valor de configuración no válido para la clave " clave ": " e.Message)
+                            continue
+                        }
+                        
+                        estado := tablaTransicion[estado]["recibe_clave-valor"]
                 }
-                
-                ; Aqui hay que evaluar el valor para convertirlo al tipo que corresponda
-                valores[clave] := valor                
             }
 
             return valores
         }
 
+        /*
+            @method CargarArchivo
 
-        inicializar() {
-            for nivel, ruta in this.NIVEL_RUTA
-                if FileExist(ruta) != "" {
-                    try
-                        this._diccNivelValores[nivel] := this.LeerArchivo(ruta)
-                    catch as e
-                        ;Log.Error("Error al leer el archivo de configuración de " nivel ": " e.Message)
-                }
-                else
-                    ; Log.Error("No se ha encontrado el archivo de configuración de " nivel ": " ruta)
+            @description Carga los valores de configuración de un nivel desde un archivo.
 
-            for clave in this._diccInfo {
-                valores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
+            @param {string} nivel - Nivel de configuración a cargar.
+        */
+        CargarArchivo(nivel) {
+            if !this.NIVEL_RUTA.Has(nivel)
+                throw Err_ValorArgError("Nivel de configuración no existente", , , , , , "nivel", 1, nivel)
+                
+            ruta := this.NIVEL_RUTA[nivel]
+            if nivel == "usuario" 
+                ruta := Format(ruta, Usuarios.LISTA[this._sesion.idUsuario].dni)
 
-                for nivel, valoresNivel in this._diccNivelValores
-                    if valoresNivel.Has(clave)                 
-                        valores[this.NIVEL_PRIORIDAD[nivel]] := valoresNivel[clave]
-
-                try
-                    this._arbolValores[clave] := valores
-                catch as e
-                    ;Log.Error("Error al cargar en el árbol los valores de configuración de la clave " clave ": " e.Message)
+            try
+                tmpDiccValores := Config._ObtenerDiccDesdeArchivo(ruta)
+            catch as e {
+                ;Log.Error("Error al leer el archivo de configuración " ruta ": " e.Message)
+                return
             }
+
+            prioridad := this.NIVEL_PRIORIDAD[nivel]
+            for clave, valores in this._diccValores {
+                if tmpDiccValores.Has(clave) {
+                    valores[prioridad] := tmpDiccValores[clave]
+                }
+                else if valores.Has(prioridad)
+                    valores.Delete(prioridad)
+            }
+        }
+
+
+        /*
+            @method inicializarValores
+
+            @description Inicializa todos los valores de configuración.
+        */
+        InicializarValores() {
+            this._arbolValores := Util_ArbolMapOrden()
+            this._diccValores := Util_MapOrden()
+
+            prioridadDefecto := Config.NIVEL_PRIORIDAD["defecto"]
+            for clave, info in this._diccInfo {
+                valores := Util_MapOrden((pr1, pr2) => pr1 > pr2)
+                this._diccValores[clave] := this._arbolValores[clave] := valores
+                valores[prioridadDefecto] := info.defecto
+            }
+
+            for nivel in Config.NIVEL_RUTA
+                this.CargarArchivo(nivel)
+
+            ; Se ordena el diccionario de valores por claves.
+            this._diccValores.Comparar := StrCompare
         }
     }
 

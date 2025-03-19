@@ -1933,7 +1933,7 @@ if (!IsSet(__UTIL_H__)) {
             @param {String} clave - Clave en el árbol. Las subclaves se separan por puntos. Si se pasa una cadena vacía se obtienen todos los valores del árbol.
             @param {String} ordenValores - En Get, puede ser "prof" para un acceso recursivo o "anch" para un acceso iterativo.
 
-            @returns {Any\MapOrden} - En set devuelve el valor que se acaba de guardar en la clave; en get devuelve un diccionario ordenado por claves con todos los valores bajo esa clave. Si ordenValores es "prof", los valores están ordenados por claves; si es "anch", los valores no están ordenados por clave, sino por niveles en el árbol. EL MapOrden devuelto no tiene asignado una función de comparación.
+            @returns {Any\MapOrden} - En set devuelve el valor que se acaba de guardar en la clave; en get devuelve un diccionario con todos los valores bajo esa clave. Si ordenValores es "prof", el orden de los valores es el obtenido en una búsqueda en profundidad bajo la clave; si es "anch", se hace búsqueda en anchura. EL MapOrden devuelto no tiene asignado una función de comparación.
 
             @throws {UnsetItemError} - Si no existe la clave en el árbol.
 
