@@ -1285,6 +1285,34 @@ if (!IsSet(__UTIL_H__)) {
     }
 
 
+    Util_CadenaADato(cadena, dicc := false) {
+        tablaTransicion := Map(
+            "inicio", Map(
+                "recibe_}", "clave-valor|seccion"
+            ), 
+            "clave-valor|seccion", Map(
+                "recibe_clave-valor", "clave-valor|seccion", 
+                "recibe_seccion", "clave_valor|seccion"
+            )
+        )
+
+        estado := "inicio"
+
+        cadena := Trim(cadena)
+
+        switch estado {
+            case "inicio":
+                if cadena[1] == "{"}"
+                ; Implementar lógica para el estado "inicio"
+                ; Aquí puedes agregar el código necesario para manejar este caso
+                break
+
+            default:
+                
+        }
+
+    }
+
     /*
         @class Util_Hash
 

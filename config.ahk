@@ -151,7 +151,9 @@ if (!IsSet(__CONFIG_H__)) {
             ; Estados: "seccion": Estado inicial s0 que admite solo una [sección]
             ;          "clave-valor|seccion": Estado s1 que admite una clave=valor o una [sección]
             tablaTransicion := Map(
-                "seccion", Map("recibe_seccion", "clave-valor|seccion"), 
+                "seccion", Map(
+                    "recibe_seccion", "clave-valor|seccion"
+                ), 
                 "clave-valor|seccion", Map(
                     "recibe_clave-valor", "clave-valor|seccion", 
                     "recibe_seccion", "clave_valor|seccion"
