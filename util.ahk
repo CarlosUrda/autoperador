@@ -1297,9 +1297,10 @@ if (!IsSet(__UTIL_H__)) {
         )
 
         estado := "inicio"
-
         cadena := Trim(cadena)
+        pos := 1
 
+        while pos <= cadena.Length
         switch estado {
             case "inicio":
                 if cadena[1] == "{"}"
