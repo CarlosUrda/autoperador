@@ -1285,7 +1285,7 @@ if (!IsSet(__UTIL_H__)) {
     }
 
 
-    Util_CadenaADato(cadena, dicc := false) {
+    Util_CadenaADato(cadena) {
         tablaTransicion := Map(
             "inicio", Map(
                 "recibe_}", "clave-valor|seccion"
@@ -1296,6 +1296,28 @@ if (!IsSet(__UTIL_H__)) {
             )
         )
 
+        if RegExMatch(cadena, "U)^\s*{\s*(.*)\s*}\s*$", &resultado) != 0 {
+            claves_valores := StrSplit(resultado[1], ",", A_Tab "`r`n" A_Space)
+            dato := {}
+            dato.__Item := Map()
+            for clave_valor in claves_valores {
+                if RegExMatch(clave_valor, "U)^(.+)\s*:\s*(.+)*$", &resultado) == 0
+                    throw ValueError.CrearErrorAHK("El formato de " clave_valor " no es correcto como <propiedad: valor> de un objeto")
+
+                prop := resultado[1]
+                valor := Util_CadenaADato(resultado[2])
+                dato.DefineProp(prop, {Value: valor})
+            }
+        }
+        else if RegExMatch(cadena, "U)^\s*[\s*(.*)\s*]\s*$", &resultado) != 0 {
+            valores := StrSplit(resultado[1], ",", A_Tab "`r`n" A_Space)
+            dato := []
+            for valor in valores {
+                prop := resultado[1]
+                valor := Util_CadenaADato(resultado[2])
+                dato.DefineProp(prop, {Value: valor})
+            }            
+        }
         estado := "inicio"
         cadena := Trim(cadena)
         pos := 1
