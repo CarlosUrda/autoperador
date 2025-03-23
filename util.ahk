@@ -242,21 +242,32 @@ if (!IsSet(__UTIL_H__)) {
 
     global Util_Llamante := _Util_Llamante
 
+    
     /*
-        @function Util_DefinePropEstandar_Prv
+        @function Util_DefinePropEstandar
 
-        @description Definir una propiedad dinámica con sus métodos get y set. La nueva propiedad no tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de ya existir previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super. Versión Prv PARA SOLO USO INTERNO. YA QUE NO COMPRUEBA NINGUNO DE LOS ARGUMENTOS.
+        @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super.
+
         - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
         - Set guardará el valor, aplicando previamente las funciones de verificación.
 
         @param {String} prop - Nombre de la propiedad.
         @param {FuncArg} funciones - Funciones de verificación tipo FuncArg usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido.
-
+        
+        @throws {Error/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
         @throws {MethodError} - Si existe algún error al definir la propiedad con DefineProp.
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
-    _Util_DefinePropEstandar_Prv(obj, prop, funciones*) {
+    _Util_DefinePropEstandarM(obj, prop, funciones*) {
+        prop := Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.Cadena)
+
+        for funcion in funciones {
+            Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, FuncArg.EsFuncArg)
+
+            /* Aquí se verificaría la función y prop para comprobar que no es maliciosa */
+        }
+
         _Get(_obj) {
             try 
                 return _obj.%"_" prop%
@@ -277,34 +288,6 @@ if (!IsSet(__UTIL_H__)) {
             return obj.DefineProp(prop, {Get: _Get, Set: _Set})
         catch as e
             throw MethodError.CrearErrorAHK("No se puede definidir la propiedad " prop, , , , , e)
-    }
-
-    
-    /*
-        @function Util_DefinePropEstandar
-
-        @description Definir una propiedad dinámica con sus métodos get y set. No tiene en consideración ni llama a la propiedad heredada, sobreescribiendo el comportamiento para el objeto en caso de que ya exista previamente o se herede (no es posible el uso de super fuera de la definición de clase). Para definir una propiedad que extienda la heredada hay que hacerlo en la definición de la clase y usando super.
-
-        - Get devuelve el valor guardado. lanzará PropertyError si el valor interno no ha sido definido.
-        - Set guardará el valor, aplicando previamente las funciones de verificación.
-
-        @param {String} prop - Nombre de la propiedad.
-        @param {FuncArg} funciones - Funciones de verificación tipo FuncArg usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido.
-        
-        @throws {Error/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
-
-        @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
-    */
-    _Util_DefinePropEstandarM(obj, prop, funciones*) {
-        prop := Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.Cadena)
-
-        for funcion in funciones {
-            Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, FuncArg.EsFuncArg)
-
-            /* Aquí se verificaría la función para comprobar que no es maliciosa */
-        }
-
-        return  _Util_DefinePropEstandar_Prv(obj, prop, funciones*)
     }
 
     _Util_DefinePropEstandar(obj, prop, funciones*) {
