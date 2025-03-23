@@ -1336,6 +1336,14 @@ if (!IsSet(__UTIL_H__)) {
 
     }
 
+    class Util_ObjetoLiteral {
+        __Item[prop] {
+            
+        }
+
+    }
+
+
     /*
         @class Util_Hash
 
