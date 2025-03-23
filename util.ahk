@@ -255,22 +255,22 @@ if (!IsSet(__UTIL_H__)) {
         @param {FuncArg} funciones - Funciones de verificación tipo FuncArg usadas en el Set que serán llamadas en el orden en que son pasadas. A cada función se le pasa como único argumento el valor recibido.
         
         @throws {Error/Err_TipoArgError} - Si los argumentos no son de tipo correcto.
-        @throws {MethodError} - Si existe algún error al definir la propiedad con DefineProp.
+        @throws {PropertyError} - Si existe algún error al definir o acceder a la propiedad..
 
         @returns {Object} - Devuelve el objeto al cual se le ha definido la propiedad.
     */
     _Util_DefinePropEstandarM(obj, prop, funciones*) {
-        prop := Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.Cadena)
+        Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.EsCadena)
 
         for funcion in funciones {
             Err_VerificarArg_Prv(funcion, funcion.HasProp("Nombre") ? funcion.Nombre : "", 2 + A_Index, FuncArg.EsFuncArg)
 
-            /* Aquí se verificaría la función y prop para comprobar que no es maliciosa */
+            /* Aquí se verificaría la función para comprobar que no es maliciosa */
         }
 
         _Get(_obj) {
             try 
-                return _obj.%"_" prop%
+                return _obj.GetOwnPropDesc("_" prop).Value
             catch as e
                 throw PropertyError.CrearErrorAHK("La propiedad " prop " no tiene aún ningún valor definido", , , , , e)
         }
@@ -279,7 +279,7 @@ if (!IsSet(__UTIL_H__)) {
             valorVerficado := Err_VerificarArg_Prv(valor, "value", 1, funciones*)
 
             try 
-                return (_obj.%"_" prop% := valorVerficado)
+                _obj.DefineProp("_" prop, {Value: valorVerficado})
             catch as e
                 throw PropertyError.CrearErrorAHK("No se puede guardar ningún valor en la propiedad " prop, , , , , e)
         }
@@ -287,7 +287,7 @@ if (!IsSet(__UTIL_H__)) {
         try 
             return obj.DefineProp(prop, {Get: _Get, Set: _Set})
         catch as e
-            throw MethodError.CrearErrorAHK("No se puede definidir la propiedad " prop, , , , , e)
+            throw PropertyError.CrearErrorAHK("No se puede definir la propiedad " prop, , , , , e)
     }
 
     _Util_DefinePropEstandar(obj, prop, funciones*) {
@@ -300,7 +300,75 @@ if (!IsSet(__UTIL_H__)) {
     Object.Prototype.DefineProp("DefinePropEstandar", {Call: _Util_DefinePropEstandarM})
     global Util_DefinePropEstandar := _Util_DefinePropEstandar
 
+
+    /*
+        @function Util_GetProp
+
+        @description Obtener el valor de una propiedad de un objeto. Se busca en el objeto y en sus ancestros. Permite usar nombres de propiedades que no son válidos en AHK como identificadores, como los que contienen espacios o caracteres especiales.
+
+        @param {Object} obj - Objeto del cual se quiere obtener la propiedad.
+        @param {String} prop - Nombre de la propiedad.
+
+        @throws {Err_TipoArgError} - Si los argumentos no son de tipo correcto.
+        @throws {PropertyError} - Si no se puede acceder a la propiedad o no tiene ningún valor definido (solo Set).
+
+        @returns {Object} - Valor de la propiedad. Si la propiedad tiene un método Get, se ejecutará y se devolverá el valor que retorne. Si la propiedad tiene un método Call, devolverá el propio método, y para ejecutarlo se deberá pasar como primer argumento el objeto. Si la propiedad tiene un valor definido, se devolverá ese valor.
         
+        @nota Recuerda que Object.Prototype.Base == Any.Prototype; y Any.Prototype.Base == ""
+    */
+    Util_GetPropM(obj, prop) {
+        Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.EsCadena)
+        verificarHasProp := true    
+        _obj := obj
+
+        Loop {
+            if verificarHasProp and !_obj.HasProp(prop)
+                break
+
+            if !_obj.HasOwnProp(prop)
+                verificarHasProp := false
+            else { 
+                desc := _obj.GetOwnPropDesc(prop)
+                if desc.HasProp("Value")
+                    return desc.Value
+                if desc.HasProp("Get")
+                    return (desc.Get)(obj)
+                if desc.HasProp("Call")
+                    return desc.Call
+    
+                verificarHasProp := true
+            }
+
+            _obj := _obj.Base
+
+        } Until _obj == ""
+    
+        throw PropertyError.CrearErrorAHK("La propiedad " prop " no existe en el objeto")
+    }
+
+    Util_GetProp(obj, prop) {
+        Err_VerificarArg_Prv(obj, "obj", 1, FuncArg((o) => o is Object, "Comprobar", "Debes pasar un objeto Object"))
+
+        return obj.GetProp(prop)
+    }
+
+    Any.Prototype.DefineProp("GetProp", {Call: Util_GetPropM})
+
+
+    Class Indexar {
+        __New(obj) {
+            this._obj := obj
+        }
+
+        __Item[prop] {
+            get => this._obj.GetProp(prop)
+            ; set => this._obj.SetProp(prop, value)
+        }
+    }
+        
+    Any.Prototype.DefineProp("__Item", {Get: (obj) => Indexar(obj)})
+
+
     /*
         @function Util_ExpandirArgs
 
@@ -1315,13 +1383,6 @@ if (!IsSet(__UTIL_H__)) {
 
             default:
                 
-        }
-
-    }
-
-    class Util_ObjetoLiteral {
-        __Item[prop] {
-            
         }
 
     }
