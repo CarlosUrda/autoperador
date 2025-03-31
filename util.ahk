@@ -314,7 +314,7 @@ if (!IsSet(__UTIL_H__)) {
 
         @returns {Object} - Valor de la propiedad. Si la propiedad tiene un método Get, se ejecutará y se devolverá el valor que retorne. Si la propiedad tiene un método Call, devolverá el propio método, y para ejecutarlo se deberá pasar como primer argumento el objeto. Si la propiedad tiene un valor definido, se devolverá ese valor.
         
-        @nota Recuerda que Object.Prototype.Base == Any.Prototype; y Any.Prototype.Base == ""
+        @nota Recuerda que Object.Prototype.Base == Any.Prototype y Any.Prototype.Base == ""
     */
     Util_GetPropM(obj, prop) {
         Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.EsCadena)
@@ -352,10 +352,54 @@ if (!IsSet(__UTIL_H__)) {
         return obj.GetProp(prop)
     }
 
-    Any.Prototype.DefineProp("GetProp", {Call: Util_GetPropM})
+    Object.Prototype.DefineProp("GetProp", {Call: Util_GetPropM})
 
 
-    Class Indexar {
+    Util_SetPropM(obj, prop, valor) {
+        Err_VerificarArg_Prv(prop, "prop", 2, FuncArg.EsCadena)
+        verificarHasProp := true    
+        _obj := obj
+
+        Loop {
+            if verificarHasProp and !_obj.HasProp(prop)
+                break
+
+            if !_obj.HasOwnProp(prop)
+                verificarHasProp := false
+            else { 
+                desc := _obj.GetOwnPropDesc(prop)
+                if desc.HasProp("Value")
+                    return desc.Value
+                if desc.HasProp("Get")
+                    return (desc.Get)(obj)
+                if desc.HasProp("Call")
+                    return desc.Call
+    
+                verificarHasProp := true
+            }
+
+            _obj := _obj.Base
+
+        } Until _obj == ""
+    
+        throw PropertyError.CrearErrorAHK("La propiedad " prop " no existe en el objeto")
+    }
+
+    Util_SetProp(obj, prop, valor) {
+        Err_VerificarArg_Prv(obj, "obj", 1, FuncArg((o) => o is Object, "Comprobar", "Debes pasar un objeto Object"))
+
+        return obj.SetProp(prop, valor)
+    }
+
+    Object.Prototype.DefineProp("SetProp", {Call: Util_SetProp})
+
+
+    /*
+        @class IndexProp
+
+        @description Clase para manejar acceder a las propiedades de un objeto de manera indexada. Se puede acceder a las propiedades de un objeto como si fueran elementos de un array o diccionario, permitiendo así acceder a propiedades con nombres no válidos como identificadores (espacios en blanco, caracteres raros, etc)
+    */
+    Class Util_IndexProp {
         __New(obj) {
             this._obj := obj
         }
@@ -366,7 +410,9 @@ if (!IsSet(__UTIL_H__)) {
         }
     }
         
-    Any.Prototype.DefineProp("__Item", {Get: (obj) => Indexar(obj)})
+    /*
+        Se define la propiedad en Object para que todos los objetos heredados de Object puedan acceder a las propiedades de manera indexada. Si una clase sobrecarga __Index (como hacen Map o Array) ya no se podrán usar los corchetes para acceder de manera indexada a las propiedades de la clase */
+    Object.Prototype.DefineProp("__Item", {Get: (obj) => Util_IndexProp(obj)})
 
 
     /*
@@ -1336,55 +1382,95 @@ if (!IsSet(__UTIL_H__)) {
     }
 
 
+    /*
+        @function Util_CadenaADato
+
+        @description Convertir una cadena en un dato. Se puede indicar el separador de los elementos de la cadena. Si no se indica, se considera que el separador es el punto.
+
+        @param {String} cadena - Cadena a convertir en dato.
+
+        @throws {Err_TipoArgError} - Si el tipo del argumento no es cadena.
+
+        @returns {Any} - Dato convertido.
+    */
     Util_CadenaADato(cadena) {
-        tablaTransicion := Map(
-            "inicio", Map(
-                "recibe_}", "clave-valor|seccion"
-            ), 
-            "clave-valor|seccion", Map(
-                "recibe_clave-valor", "clave-valor|seccion", 
-                "recibe_seccion", "clave_valor|seccion"
-            )
-        )
+        Err_VerificarArg_Prv(cadena, "cadena", 1, FuncArg.EsCadena)
 
-        if RegExMatch(cadena, "U)^\s*{\s*(.*)\s*}\s*$", &resultado) != 0 {
-            claves_valores := StrSplit(resultado[1], ",", A_Tab "`r`n" A_Space)
-            dato := {}
-            dato.__Item := Map()
-            for clave_valor in claves_valores {
-                if RegExMatch(clave_valor, "U)^(.+)\s*:\s*(.+)*$", &resultado) == 0
-                    throw ValueError.CrearErrorAHK("El formato de " clave_valor " no es correcto como <propiedad: valor> de un objeto")
+        resultado := ""
+        pos := 1
+        estado := "inicio"
 
-                prop := resultado[1]
-                valor := Util_CadenaADato(resultado[2])
-                dato.DefineProp(prop, {Value: valor})
+        Loop {
+            switch estado {
+                case "inicio":         
+                    if RegExMatch(cadena, "^\s*\{", &resultado) != 0 {
+                        estado := "objeto"
+                        dato := {}
+                    }
+                    else if RegExMatch(cadena, "^\s*\[", &resultado) != 0 {
+                        estado := "lista"
+                        dato := []
+                    }
+                    else if RegExMatch(cadena, "^\s*['`"]", &resultado) != 0 {
+                        estado := "cadena"
+                        vacios := 0
+                        dato := ""
+                    }
+                    else if IsNumber(cadena)
+                        return Number(cadena)
+                    else {
+                        try
+                            return Err_CadenaABool(cadena)
+                        catch as e
+                            break
+                    }
+
+                    pos := resultado.Pos + resultado.Len
+
+                case "cadena":
+                    if RegExMatch(cadena, "(.*?)" cadena[pos-1] "\s*$", &resultado, pos) != 0
+                        return resultado[1]
+                    
+                    break
+
+                case "lista":
+                    if RegExMatch(cadena, "\G\s*\]\s*$", , pos) {
+                        if IsSet(elemento) {
+                            dato.Length += vacios
+                            dato.Push(elemento)
+                        }
+                        return dato
+                    }
+                    else if RegExMatch(cadena, "\G\s*,", &resultado, pos) {
+                        if IsSet(elemento) {
+                            dato.Length += vacios
+                            dato.Push(elemento)
+                            elemento := unset
+                            vacios := 0
+                        }
+                        else
+                            vacios++
+                    }
+                    else if IsSet(elemento)
+                        break
+                    else if RegExMatch(cadena, "\G\s*((['`"\[{]]).*?\1)", &resultado, pos) != 0 or RegExMatch(cadena, "\G\s*([\w\d.-]+?)", &resultado, pos) != 0
+                        elemento := Util_CadenaADato(resultado[1])
+                    else
+                        break
+
+                    pos := resultado.Pos + resultado.Len
+
+                case "objeto":
+                    if RegExMatch(cadena, "\G\s*\}\s*$", , pos) {
+                        if IsSet(campo) and IsSet(valor) {
+                            dato.DefineProp(campo, {Value: valor})
+                        }
+                        return dato
+                    }
             }
         }
-        else if RegExMatch(cadena, "U)^\s*[\s*(.*)\s*]\s*$", &resultado) != 0 {
-            valores := StrSplit(resultado[1], ",", A_Tab "`r`n" A_Space)
-            dato := []
-            for valor in valores {
-                prop := resultado[1]
-                valor := Util_CadenaADato(resultado[2])
-                dato.DefineProp(prop, {Value: valor})
-            }            
-        }
-        estado := "inicio"
-        cadena := Trim(cadena)
-        pos := 1
 
-        while pos <= cadena.Length
-        switch estado {
-            case "inicio":
-                if cadena[1] == "{"}"
-                ; Implementar lógica para el estado "inicio"
-                ; Aquí puedes agregar el código necesario para manejar este caso
-                break
-
-            default:
-                
-        }
-
+        throw Err_TipoArgError("El argumento no se puede convertir a un dato válido", , , , , e, "cadena", 1, cadena, Type(cadena))
     }
 
 

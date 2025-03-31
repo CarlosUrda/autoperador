@@ -99,7 +99,7 @@ if (!IsSet(__ERR_H__))
 
         @returns true o false.
     */
-    Err_Bool(valor) => valor ? true : false
+    Err_Bool(valor) => !valor ? false : true
 
     /*
         @function Err_CadenaABool
@@ -114,8 +114,7 @@ if (!IsSet(__ERR_H__))
         @throws {Err_ValorArgError} - Si el valor de la cadena no es "true" o "false".
     */
     Err_CadenaABool(cadena) {
-        if !Err_EsCadena(cadena)
-            throw Err_TipoArgError("El valor no es una cadena", , , , , , "cadena", 1, cadena, Type(cadena))
+        Err_VerificarArg_Prv(cadena, "cadena", 1, FuncArg.EsCadena)
 
         cadena := StrLower(cadena)
         if cadena == "true"

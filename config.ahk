@@ -182,11 +182,13 @@ if (!IsSet(__CONFIG_H__)) {
                 if linea = ""
                     continue
 
+                ; Siempre se puede recibir una sección
                 if ObtenerSeccion() {
                     estado := tablaTransicion[estado]["recibe_seccion"]
                     continue
                 }
 
+                ; En caso de no recibir una sección.
                 switch estado {
                     case "seccion":
                         ;Log.Error("(L " A_Index "): Se espera [sección] en el archivo de configuración " ruta ": " linea)
