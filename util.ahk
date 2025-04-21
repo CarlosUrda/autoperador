@@ -1383,7 +1383,7 @@ if (!IsSet(__UTIL_H__)) {
     /*
         @function Util_CadenaADato
     
-        @description Convertir una cadena en un dato. Se puede indicar el separador de los elementos de la cadena. Si no se indica, se considera que el separador es el punto.
+        @description Convertir una cadena en un dato.
     
         @param {String} cadena - Cadena a convertir en dato.
     
